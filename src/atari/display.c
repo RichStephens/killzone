@@ -124,16 +124,16 @@ void display_draw_status_bar(const char *player_name, uint8_t player_count,
     }
     
     /* Line 1: Player info */
-    printf("%-15s | Players: %2d | Conn: %s\n", player_name, player_count, connection_status);
+    printf("%s | Players:%d | %s\n", player_name, player_count, connection_status);
     
     /* Line 2: World state */
-    printf("World Ticks: %5d\n", world_ticks);
+    printf("Ticks:%d\n", world_ticks);
     
     /* Line 3: Separator */
     printf("----------------------------------------\n");
     
     /* Line 4: Command help */
-    printf("WASD/Arrows=Move | Q=Quit | A=Attack\n");
+    printf("WASD=Move Q=Quit A=Attack\n");
 }
 
 /**
