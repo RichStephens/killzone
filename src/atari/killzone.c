@@ -504,8 +504,78 @@ void parse_join_response(const uint8_t *response, uint16_t len) {
 }
 
 /**
+ * Parse entities from players array in JSON
+ * Extracts x,y coordinates for each entity
+ */
+void parse_entities_from_response(const uint8_t *response, uint16_t len) {
+    const char *json = (const char *)response;
+    const char *array_pos;
+    const char *id_start;
+    const char *x_start;
+    const char *y_start;
+    const char *next_obj;
+    const char *id_val;
+    uint8_t count = 0;
+    player_state_t *local = (player_state_t *)state_get_local_player();
+    char id_buf[32];
+    uint32_t x_val, y_val;
+    int i;
+    static player_state_t other_players[MAX_OTHER_PLAYERS];
+    
+    /* Find players array */
+    array_pos = strstr(json, "\"players\":[");
+    if (!array_pos) return;
+    
+    array_pos += 11; /* Skip "players":[ */
+    
+    /* Parse each entity - look for {"id":"...", "x":N, "y":N} patterns */
+    while (count < MAX_OTHER_PLAYERS && *array_pos && *array_pos != ']') {
+        id_start = strstr(array_pos, "\"id\":\"");
+        x_start = strstr(array_pos, "\"x\":");
+        y_start = strstr(array_pos, "\"y\":");
+        next_obj = strchr(array_pos, '}');
+        
+        if (!id_start || !x_start || !y_start || !next_obj) break;
+        if (id_start > next_obj) break; /* id not in this object */
+        
+        /* Extract id */
+        id_val = id_start + 6;
+        i = 0;
+        while (i < 31 && id_val[i] && id_val[i] != '"') {
+            id_buf[i] = id_val[i];
+            i++;
+        }
+        id_buf[i] = '\0';
+        
+        /* Skip local player */
+        if (local && strcmp(id_buf, local->id) == 0) {
+            array_pos = next_obj + 1;
+            continue;
+        }
+        
+        /* Extract x */
+        x_val = (uint32_t)strtol(x_start + 4, NULL, 10);
+        
+        /* Extract y */
+        y_val = (uint32_t)strtol(y_start + 4, NULL, 10);
+        
+        /* Store entity */
+        strncpy(other_players[count].id, id_buf, sizeof(other_players[count].id) - 1);
+        other_players[count].x = (uint8_t)x_val;
+        other_players[count].y = (uint8_t)y_val;
+        other_players[count].health = 100;
+        strcpy(other_players[count].status, "alive");
+        count++;
+        
+        array_pos = next_obj + 1;
+    }
+    
+    /* Update state with other players */
+    state_set_other_players(other_players, count);
+}
+
+/**
  * Parse world state JSON - extract entities from players array
- * Note: Simplified parser due to cc65 local variable limits
  */
 void parse_world_state(const uint8_t *response, uint16_t len) {
     uint32_t width, height, ticks;
@@ -527,9 +597,6 @@ void parse_world_state(const uint8_t *response, uint16_t len) {
         state_set_world_ticks((uint16_t)ticks);
     }
     
-    /* TODO: Parse player array from JSON
-     * Full array parsing deferred due to cc65 local variable limits.
-     * For now, other players are rendered on first screen draw only.
-     * They will update when world state is fetched again.
-     */
+    /* Parse entities from players array */
+    parse_entities_from_response(response, len);
 }
