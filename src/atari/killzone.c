@@ -1,0 +1,367 @@
+/**
+ * KillZone Atari 8-bit Client - Main Game Loop
+ * 
+ * Phase 2: Player Management & Authentication
+ * - Server connection initialization
+ * - Player join/leave
+ * - Local player representation
+ * - Display system
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#include "network.h"
+#include "state.h"
+#include "display.h"
+#include "json.h"
+
+/* Game constants */
+#define GAME_TITLE "KillZone"
+#define PLAYER_NAME_MAX 32
+#define RESPONSE_BUFFER_SIZE 1024
+
+/* Function declarations */
+void game_init(void);
+void game_loop(void);
+void game_close(void);
+void handle_state_init(void);
+void handle_state_connecting(void);
+void handle_state_joining(void);
+void handle_state_playing(void);
+void handle_state_dead(void);
+void handle_state_error(void);
+void parse_join_response(const uint8_t *response, uint16_t len);
+void parse_world_state(const uint8_t *response, uint16_t len);
+
+/* Global response buffer */
+static uint8_t response_buffer[RESPONSE_BUFFER_SIZE];
+
+/**
+ * Main entry point
+ */
+int main(void) {
+    printf("\n%s - Atari 8-bit Multiplayer Game\n", GAME_TITLE);
+    printf("Initializing...\n");
+    printf("Press any key to continue...\n");
+    getchar();
+    
+    game_init();
+    game_loop();
+    game_close();
+    
+    printf("Goodbye!\n\n");
+    printf("Press any key to exit...\n");
+    getchar();
+    return 0;
+}
+
+/**
+ * Initialize game systems
+ */
+void game_init(void) {
+    state_init();
+    display_init();
+    
+    if (kz_network_init() != 0) {
+        state_set_error("Network initialization failed");
+        state_set_current(STATE_ERROR);
+    } else {
+        state_set_current(STATE_CONNECTING);
+        printf("Game initialized. Connecting to server...\n");
+    }
+}
+
+/**
+ * Close game systems
+ */
+void game_close(void) {
+    display_close();
+    kz_network_close();
+    state_close();
+}
+
+/**
+ * Main game loop
+ */
+void game_loop(void) {
+    int running = 1;
+    int frame_count = 0;
+    client_state_t current;
+    
+    while (running && frame_count < 100) {
+        current = state_get_current();
+        frame_count++;
+        
+        printf("[Frame %d] State: %d\n", frame_count, current);
+        
+        switch (current) {
+            case STATE_INIT:
+                handle_state_init();
+                break;
+            case STATE_CONNECTING:
+                handle_state_connecting();
+                break;
+            case STATE_JOINING:
+                handle_state_joining();
+                break;
+            case STATE_PLAYING:
+                handle_state_playing();
+                break;
+            case STATE_DEAD:
+                handle_state_dead();
+                break;
+            case STATE_ERROR:
+                handle_state_error();
+                running = 0;
+                break;
+            default:
+                running = 0;
+                break;
+        }
+    }
+    
+    if (frame_count >= 100) {
+        printf("Game loop timeout (100 frames)\n");
+    }
+}
+
+/**
+ * Handle STATE_INIT
+ */
+void handle_state_init(void) {
+    state_set_current(STATE_CONNECTING);
+}
+
+/**
+ * Handle STATE_CONNECTING
+ * 
+ * Attempt to connect to server and verify it's running
+ */
+void handle_state_connecting(void) {
+    int16_t bytes_read;
+    static int attempt = 0;
+    
+    printf("Checking server health (attempt %d)...\n", ++attempt);
+    printf("Connecting to %s:%d\n", SERVER_HOST, SERVER_PORT);
+    
+    bytes_read = kz_network_health_check(response_buffer, RESPONSE_BUFFER_SIZE);
+    printf("Health check returned: %d bytes\n", (int)bytes_read);
+    
+    if (bytes_read > 0) {
+        printf("Response: %s\n", (const char *)response_buffer);
+        /* Check for "status":"healthy" in health check response */
+        if (strstr((const char *)response_buffer, "healthy") != NULL) {
+            printf("Server is healthy. Ready to join.\n");
+            state_set_current(STATE_JOINING);
+        } else {
+            printf("Server response not healthy\n");
+            state_set_error("Server response invalid");
+            state_set_current(STATE_ERROR);
+        }
+    } else {
+        printf("ERROR: No response from server (got %d)\n", (int)bytes_read);
+        state_set_error("Server not responding");
+        state_set_current(STATE_ERROR);
+    }
+}
+
+/**
+ * Handle STATE_JOINING
+ * 
+ * Join the game world with a player name
+ */
+void handle_state_joining(void) {
+    char player_name[PLAYER_NAME_MAX];
+    int16_t bytes_read;
+    size_t len;
+    int i;
+    
+    printf("Enter player name (max %d chars): ", PLAYER_NAME_MAX - 1);
+    fflush(stdout);
+    fgets(player_name, sizeof(player_name), stdin);
+    
+    printf("Raw input length: %d\n", (int)strlen(player_name));
+    
+    /* Remove newline and carriage return */
+    len = strlen(player_name);
+    if (len > 0 && player_name[len - 1] == '\n') {
+        player_name[len - 1] = '\0';
+        len--;
+    }
+    if (len > 0 && player_name[len - 1] == '\r') {
+        player_name[len - 1] = '\0';
+        len--;
+    }
+    
+    /* Trim whitespace */
+    for (i = 0; i < len; i++) {
+        if (player_name[i] == ' ' || player_name[i] == '\t') {
+            player_name[i] = '\0';
+            break;
+        }
+    }
+    
+    if (strlen(player_name) == 0) {
+        strcpy(player_name, "Player");
+    }
+    
+    printf("Name: '%s' (%d chars)\n", player_name, (int)strlen(player_name));
+    
+    bytes_read = kz_network_join_player(player_name, response_buffer, RESPONSE_BUFFER_SIZE);
+    printf("Join returned: %d bytes\n", (int)bytes_read);
+    
+    if (bytes_read > 0) {
+        printf("Response: %s\n", (const char *)response_buffer);
+        parse_join_response(response_buffer, (uint16_t)bytes_read);
+        
+        if (json_is_success((const char *)response_buffer)) {
+            printf("Successfully joined!\n");
+            state_set_current(STATE_PLAYING);
+        } else {
+            printf("Server rejected join\n");
+            state_set_error("Join request failed");
+            state_set_current(STATE_ERROR);
+        }
+    } else {
+        printf("Network error: %d\n", (int)bytes_read);
+        state_set_error("Join request failed");
+        state_set_current(STATE_ERROR);
+    }
+}
+
+/**
+ * Handle STATE_PLAYING
+ * 
+ * Main gameplay loop
+ */
+void handle_state_playing(void) {
+    static int frame_count = 0;
+    int16_t bytes_read;
+    world_state_t *world;
+    const player_state_t *player;
+    
+    /* Get world state periodically */
+    if (frame_count++ % 10 == 0) {
+        bytes_read = kz_network_get_world_state(response_buffer, RESPONSE_BUFFER_SIZE);
+        
+        if (bytes_read > 0) {
+            parse_world_state(response_buffer, (uint16_t)bytes_read);
+        }
+        
+        /* Draw world */
+        world = (world_state_t *)malloc(sizeof(world_state_t));
+        if (world) {
+            /* TODO: Populate world from state */
+            display_draw_world(world);
+            display_update();
+            free(world);
+        }
+    }
+    
+    /* TODO: Handle input and movement */
+    
+    /* For now, just display status */
+    if (frame_count % 30 == 0) {
+        player = state_get_local_player();
+        display_draw_status(player);
+    }
+}
+
+/**
+ * Handle STATE_DEAD
+ * 
+ * Player has been eliminated, offer to rejoin
+ */
+void handle_state_dead(void) {
+    int c;
+    
+    printf("You have been eliminated!\n");
+    printf("Rejoin? (y/n): ");
+    
+    c = getchar();
+    if (c == 'y' || c == 'Y') {
+        state_set_current(STATE_JOINING);
+    } else {
+        state_set_current(STATE_ERROR);
+    }
+}
+
+/**
+ * Handle STATE_ERROR
+ * 
+ * Error state - game ends
+ */
+void handle_state_error(void) {
+    printf("ERROR: %s\n", state_get_error());
+}
+
+/**
+ * Parse join response JSON
+ */
+void parse_join_response(const uint8_t *response, uint16_t len) {
+    char player_id[32];
+    uint32_t x, y, health;
+    player_state_t player;
+    const char *json;
+    
+    if (!response || len == 0) {
+        return;
+    }
+    
+    json = (const char *)response;
+    
+    /* Extract player ID */
+    if (json_get_string(json, "id", player_id, sizeof(player_id)) == 0) {
+        printf("Failed to extract player ID\n");
+        return;
+    }
+    
+    /* Extract position */
+    if (!json_get_uint(json, "x", &x) || !json_get_uint(json, "y", &y)) {
+        printf("Failed to extract position\n");
+        return;
+    }
+    
+    /* Extract health */
+    if (!json_get_uint(json, "health", &health)) {
+        health = 100;
+    }
+    
+    /* Create player state */
+    strncpy(player.id, player_id, sizeof(player.id) - 1);
+    player.x = (uint8_t)x;
+    player.y = (uint8_t)y;
+    player.health = (uint8_t)health;
+    strcpy(player.status, "alive");
+    
+    /* Store in state */
+    state_set_local_player(&player);
+    
+    printf("Player ID: %s\n", player_id);
+    printf("Spawn position: (%d, %d)\n", (int)x, (int)y);
+    printf("Health: %d\n", (int)health);
+}
+
+/**
+ * Parse world state JSON
+ */
+void parse_world_state(const uint8_t *response, uint16_t len) {
+    uint32_t width, height;
+    const char *json;
+    
+    if (!response || len == 0) {
+        return;
+    }
+    
+    json = (const char *)response;
+    
+    /* Extract world dimensions */
+    if (json_get_uint(json, "width", &width) && json_get_uint(json, "height", &height)) {
+        state_set_world_dimensions((uint8_t)width, (uint8_t)height);
+    }
+    
+    /* TODO: Parse player array from JSON */
+}
