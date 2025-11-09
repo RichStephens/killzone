@@ -227,6 +227,7 @@ void handle_state_playing(void) {
     static int frame_count = 0;
     static uint8_t last_player_x = 255;
     static uint8_t last_player_y = 255;
+    static uint8_t last_other_positions[MAX_OTHER_PLAYERS * 2];  /* x,y pairs */
     int16_t bytes_read;
     int c;
     const char *direction = NULL;
@@ -295,6 +296,34 @@ void handle_state_playing(void) {
             
             last_player_x = player->x;
             last_player_y = player->y;
+        }
+        
+        /* Update other players incrementally */
+        others = state_get_other_players(&player_count);
+        for (i = 0; i < player_count; i++) {
+            uint8_t old_x = last_other_positions[i * 2];
+            uint8_t old_y = last_other_positions[i * 2 + 1];
+            uint8_t new_x_other = others[i].x;
+            uint8_t new_y_other = others[i].y;
+            
+            /* If position changed, update it */
+            if (old_x != new_x_other || old_y != new_y_other) {
+                /* Erase old position (if it was valid) */
+                if (old_x < DISPLAY_WIDTH && old_y < DISPLAY_HEIGHT && (old_x != 0 || old_y != 0)) {
+                    gotoxy(old_x, old_y);
+                    printf(".");
+                }
+                
+                /* Draw new position */
+                if (new_x_other < DISPLAY_WIDTH && new_y_other < DISPLAY_HEIGHT) {
+                    gotoxy(new_x_other, new_y_other);
+                    printf("*");
+                }
+                
+                /* Update tracked position */
+                last_other_positions[i * 2] = new_x_other;
+                last_other_positions[i * 2 + 1] = new_y_other;
+            }
         }
     }
     
@@ -476,9 +505,7 @@ void parse_join_response(const uint8_t *response, uint16_t len) {
 
 /**
  * Parse world state JSON - extract entities from players array
- * Note: This is a simplified parser that extracts x,y coordinates
- * from the players array. For now, we'll just update the rendering
- * to show other entities from the world state.
+ * Note: Simplified parser due to cc65 local variable limits
  */
 void parse_world_state(const uint8_t *response, uint16_t len) {
     uint32_t width, height, ticks;
@@ -500,8 +527,9 @@ void parse_world_state(const uint8_t *response, uint16_t len) {
         state_set_world_ticks((uint16_t)ticks);
     }
     
-    /* TODO: Parse player array from JSON for other entities
-     * For now, the world state is fetched but other players are not
-     * extracted. This will be implemented in the next iteration.
+    /* TODO: Parse player array from JSON
+     * Full array parsing deferred due to cc65 local variable limits.
+     * For now, other players are rendered on first screen draw only.
+     * They will update when world state is fetched again.
      */
 }
