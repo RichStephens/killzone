@@ -14,6 +14,7 @@ class World {
     this.height = height;
     this.players = new Map(); // playerId -> Player object
     this.timestamp = Date.now();
+    this.ticks = 0;
   }
 
   /**
@@ -102,6 +103,7 @@ class World {
    * @returns {Object} - World state object
    */
   getState() {
+    this.ticks++;  /* Increment world ticks on each state query */
     return {
       width: this.width,
       height: this.height,
@@ -112,6 +114,7 @@ class World {
         health: p.health,
         status: p.status
       })),
+      ticks: this.ticks,
       timestamp: this.timestamp
     };
   }

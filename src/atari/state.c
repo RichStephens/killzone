@@ -14,6 +14,7 @@ static player_state_t other_players[MAX_OTHER_PLAYERS];
 static uint8_t other_player_count = 0;
 static uint8_t world_width = 40;
 static uint8_t world_height = 20;
+static uint16_t world_ticks = 0;
 static char error_message[128];
 
 /**
@@ -151,4 +152,18 @@ void state_set_error(const char *message) {
  */
 const char *state_get_error(void) {
     return error_message;
+}
+
+/**
+ * Set world ticks
+ */
+void state_set_world_ticks(uint16_t ticks) {
+    world_ticks = ticks;
+}
+
+/**
+ * Get world ticks
+ */
+uint16_t state_get_world_ticks(void) {
+    return world_ticks;
 }

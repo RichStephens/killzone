@@ -29,6 +29,7 @@ typedef struct {
     uint8_t other_player_count;
     uint8_t world_width;
     uint8_t world_height;
+    uint16_t world_ticks;
 } world_state_t;
 
 /* Client state machine */
@@ -64,6 +65,10 @@ void state_clear_other_players(void);
 void state_set_world_dimensions(uint8_t width, uint8_t height);
 uint8_t state_get_world_width(void);
 uint8_t state_get_world_height(void);
+
+/* World ticks */
+void state_set_world_ticks(uint16_t ticks);
+uint16_t state_get_world_ticks(void);
 
 /* Error handling */
 void state_set_error(const char *message);

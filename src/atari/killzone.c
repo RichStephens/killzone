@@ -1,17 +1,18 @@
 /**
  * KillZone Atari 8-bit Client - Main Game Loop
  * 
- * Phase 2: Player Management & Authentication
- * - Server connection initialization
- * - Player join/leave
- * - Local player representation
- * - Display system
+ * Phase 3: Movement & Real-Time Synchronization
+ * - Keyboard input handling
+ * - Player movement submission
+ * - World state polling
+ * - Combat handling
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <conio.h>
 
 #include "network.h"
 #include "state.h"
@@ -235,38 +236,102 @@ void handle_state_joining(void) {
 /**
  * Handle STATE_PLAYING
  * 
- * Main gameplay loop
+ * Main gameplay loop with input and movement
  */
 void handle_state_playing(void) {
     static int frame_count = 0;
+    static int world_update_timer = 0;
     int16_t bytes_read;
-    world_state_t *world;
-    const player_state_t *player;
+    int c;
+    const char *direction = NULL;
+    player_state_t *player;
+    uint8_t player_count;
     
-    /* Get world state periodically */
+    /* Get world state periodically (every 10 frames) */
     if (frame_count++ % 10 == 0) {
         bytes_read = kz_network_get_world_state(response_buffer, RESPONSE_BUFFER_SIZE);
         
         if (bytes_read > 0) {
             parse_world_state(response_buffer, (uint16_t)bytes_read);
-        }
-        
-        /* Draw world */
-        world = (world_state_t *)malloc(sizeof(world_state_t));
-        if (world) {
-            /* TODO: Populate world from state */
-            display_draw_world(world);
-            display_update();
-            free(world);
+            printf("World state updated\n");
         }
     }
     
-    /* TODO: Handle input and movement */
+    /* Display status bar periodically (every 5 frames) */
+    if (frame_count % 5 == 0) {
+        player = (player_state_t *)state_get_local_player();
+        if (player) {
+            const player_state_t *others = state_get_other_players(&player_count);
+            player_count++;  /* Include self */
+            display_draw_status_bar(player->id, player_count, "CONNECTED", state_get_world_ticks());
+        }
+    }
     
-    /* For now, just display status */
+    /* Check for keyboard input (non-blocking) */
+    if (kbhit()) {
+        c = cgetc();
+        player = (player_state_t *)state_get_local_player();
+        
+        if (!player) {
+            return;
+        }
+        
+        /* Parse movement commands */
+        switch (c) {
+            case 'w':
+            case 'W':
+            case 'k':  /* vi-style up */
+                direction = "up";
+                break;
+            case 's':
+            case 'S':
+            case 'j':  /* vi-style down */
+                direction = "down";
+                break;
+            case 'a':
+            case 'A':
+            case 'h':  /* vi-style left */
+                direction = "left";
+                break;
+            case 'd':
+            case 'D':
+            case 'l':  /* vi-style right */
+                direction = "right";
+                break;
+            case 'q':
+            case 'Q':
+                printf("Leaving game...\n");
+                kz_network_leave_player(player->id, response_buffer, RESPONSE_BUFFER_SIZE);
+                state_set_current(STATE_INIT);
+                return;
+            default:
+                break;
+        }
+        
+        /* Send movement command if valid */
+        if (direction) {
+            printf("Moving %s...\n", direction);
+            bytes_read = kz_network_move_player(player->id, direction, response_buffer, RESPONSE_BUFFER_SIZE);
+            
+            if (bytes_read > 0) {
+                printf("Move response: %d bytes\n", (int)bytes_read);
+                /* Parse response to check for combat */
+                if (strstr((const char *)response_buffer, "combat") != NULL) {
+                    printf("Combat occurred!\n");
+                }
+            } else {
+                printf("Move failed: %d\n", (int)bytes_read);
+            }
+        }
+    }
+    
+    /* Display status periodically */
     if (frame_count % 30 == 0) {
-        player = state_get_local_player();
-        display_draw_status(player);
+        player = (player_state_t *)state_get_local_player();
+        if (player) {
+            printf("Player: %s at (%d, %d) HP: %d\n", 
+                   player->id, player->x, player->y, player->health);
+        }
     }
 }
 
@@ -349,7 +414,7 @@ void parse_join_response(const uint8_t *response, uint16_t len) {
  * Parse world state JSON
  */
 void parse_world_state(const uint8_t *response, uint16_t len) {
-    uint32_t width, height;
+    uint32_t width, height, ticks;
     const char *json;
     
     if (!response || len == 0) {
@@ -361,6 +426,11 @@ void parse_world_state(const uint8_t *response, uint16_t len) {
     /* Extract world dimensions */
     if (json_get_uint(json, "width", &width) && json_get_uint(json, "height", &height)) {
         state_set_world_dimensions((uint8_t)width, (uint8_t)height);
+    }
+    
+    /* Extract world ticks */
+    if (json_get_uint(json, "ticks", &ticks)) {
+        state_set_world_ticks((uint16_t)ticks);
     }
     
     /* TODO: Parse player array from JSON */

@@ -111,3 +111,34 @@ void display_update(void) {
         printf("\n");
     }
 }
+
+/**
+ * Draw status bar (last 4 lines of screen)
+ * 
+ * Shows: player name, player count, connection status, world ticks
+ */
+void display_draw_status_bar(const char *player_name, uint8_t player_count, 
+                             const char *connection_status, uint16_t world_ticks) {
+    if (!player_name || !connection_status) {
+        return;
+    }
+    
+    /* Line 1: Player info */
+    printf("%-15s | Players: %2d | Conn: %s\n", player_name, player_count, connection_status);
+    
+    /* Line 2: World state */
+    printf("World Ticks: %5d\n", world_ticks);
+    
+    /* Line 3: Separator */
+    printf("----------------------------------------\n");
+    
+    /* Line 4: Command help */
+    printf("WASD/Arrows=Move | Q=Quit | A=Attack\n");
+}
+
+/**
+ * Draw command help line
+ */
+void display_draw_command_help(void) {
+    printf("WASD/Arrows=Move | Q=Quit | A=Attack\n");
+}
