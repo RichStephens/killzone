@@ -238,21 +238,21 @@ void handle_state_playing(void) {
     const char *loser_start;
     uint32_t new_x, new_y;
     
+    /* Get world state periodically (every 5 frames) */
+    if (frame_count++ % 5 == 0) {
+        bytes_read = kz_network_get_world_state(response_buffer, RESPONSE_BUFFER_SIZE);
+        
+        if (bytes_read > 0) {
+            parse_world_state(response_buffer, (uint16_t)bytes_read);
+        }
+    }
+    
     /* Render game world */
     player = (player_state_t *)state_get_local_player();
     if (player && player->x < 255 && player->y < 255) {
-        /* Full redraw on first render or after world state update */
+        /* Full redraw on first render only */
         static int world_rendered = 0;
         
-        /* Get world state periodically (every 5 frames) */
-        if (frame_count++ % 5 == 0) {
-            bytes_read = kz_network_get_world_state(response_buffer, RESPONSE_BUFFER_SIZE);
-            
-            if (bytes_read > 0) {
-                parse_world_state(response_buffer, (uint16_t)bytes_read);
-                world_rendered = 0;  /* Force full redraw on world state update */
-            }
-        }
         if (!world_rendered) {
             clrscr();
             
