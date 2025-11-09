@@ -282,7 +282,7 @@ void handle_state_playing(void) {
         if (player) {
             const player_state_t *others = state_get_other_players(&player_count);
             player_count++;  /* Include self */
-            display_draw_status_bar(player->id, player_count, "CONNECTED", state_get_world_ticks());
+            display_draw_status_bar(player->name, player_count, "CONNECTED", state_get_world_ticks());
         }
     }
     
@@ -383,6 +383,7 @@ void handle_state_error(void) {
  */
 void parse_join_response(const uint8_t *response, uint16_t len) {
     char player_id[32];
+    char player_name[32];
     uint32_t x, y, health;
     player_state_t player;
     const char *json;
@@ -398,6 +399,11 @@ void parse_join_response(const uint8_t *response, uint16_t len) {
         return;
     }
     
+    /* Extract player name if available, otherwise use ID */
+    if (json_get_string(json, "name", player_name, sizeof(player_name)) == 0) {
+        strncpy(player_name, player_id, sizeof(player_name) - 1);
+    }
+    
     /* Extract position */
     if (!json_get_uint(json, "x", &x) || !json_get_uint(json, "y", &y)) {
         return;
@@ -410,6 +416,7 @@ void parse_join_response(const uint8_t *response, uint16_t len) {
     
     /* Create player state */
     strncpy(player.id, player_id, sizeof(player.id) - 1);
+    strncpy(player.name, player_name, sizeof(player.name) - 1);
     player.x = (uint8_t)x;
     player.y = (uint8_t)y;
     player.health = (uint8_t)health;

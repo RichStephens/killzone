@@ -16,6 +16,7 @@
 /* Player state */
 typedef struct {
     char id[32];
+    char name[32];
     uint8_t x;
     uint8_t y;
     uint8_t health;

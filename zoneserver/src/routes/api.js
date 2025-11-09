@@ -72,6 +72,7 @@ function createApiRoutes(world) {
     res.status(201).json({
       success: true,
       id: playerId,
+      name: name,
       x: x,
       y: y,
       health: player.health,
