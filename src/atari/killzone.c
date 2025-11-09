@@ -240,7 +240,8 @@ void handle_state_joining(void) {
  */
 void handle_state_playing(void) {
     static int frame_count = 0;
-    static int world_rendered = 0;
+    static uint8_t last_player_x = 255;
+    static uint8_t last_player_y = 255;
     int16_t bytes_read;
     int c;
     const char *direction = NULL;
@@ -249,32 +250,26 @@ void handle_state_playing(void) {
     uint8_t x, y, i;
     const player_state_t *others;
     
-    /* Get world state periodically (every 10 frames) */
-    if (frame_count++ % 10 == 0) {
+    /* Get world state periodically (every 5 frames) */
+    if (frame_count++ % 5 == 0) {
         bytes_read = kz_network_get_world_state(response_buffer, RESPONSE_BUFFER_SIZE);
         
         if (bytes_read > 0) {
             parse_world_state(response_buffer, (uint16_t)bytes_read);
-            world_rendered = 0;  /* Force re-render */
         }
     }
     
-    /* Render game world */
-    if (!world_rendered) {
+    /* Render game world only when player position changes (and we have a valid position) */
+    player = (player_state_t *)state_get_local_player();
+    if (player && player->x < 255 && player->y < 255 && (player->x != last_player_x || player->y != last_player_y)) {
         clrscr();
-        /* Draw the game world */
+        
+        /* Draw world line by line */
         for (y = 0; y < DISPLAY_HEIGHT; y++) {
             gotoxy(0, y);
             for (x = 0; x < DISPLAY_WIDTH; x++) {
                 printf(".");
             }
-        }
-        
-        /* Draw local player as @ */
-        player = (player_state_t *)state_get_local_player();
-        if (player && player->x < DISPLAY_WIDTH && player->y < DISPLAY_HEIGHT) {
-            gotoxy(player->x, player->y);
-            printf("@");
         }
         
         /* Draw other players as * */
@@ -286,13 +281,19 @@ void handle_state_playing(void) {
             }
         }
         
-        world_rendered = 1;
+        /* Draw local player as @ (last so it appears on top) */
+        if (player->x < DISPLAY_WIDTH && player->y < DISPLAY_HEIGHT) {
+            gotoxy(player->x, player->y);
+            printf("@");
+        }
+        
+        last_player_x = player->x;
+        last_player_y = player->y;
     }
     
-    /* Display status bar */
-    player = (player_state_t *)state_get_local_player();
+    /* Display status bar every frame */
     if (player) {
-        const player_state_t *others = state_get_other_players(&player_count);
+        others = state_get_other_players(&player_count);
         player_count++;  /* Include self */
         display_draw_status_bar(player->id, player_count, "CONNECTED", state_get_world_ticks());
     }
@@ -350,7 +351,6 @@ void handle_state_playing(void) {
                 if (strstr((const char *)response_buffer, "combat") != NULL) {
                     /* Combat occurred - will be handled on next world state update */
                 }
-                world_rendered = 0;  /* Force re-render after move */
             }
         }
     }
