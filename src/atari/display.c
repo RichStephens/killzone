@@ -2,11 +2,13 @@
  * KillZone Display Module Implementation - Atari 8-bit
  * 
  * Text-based display rendering.
+ * Uses Atari's text mode with last 4 lines for status bar.
  */
 
 #include "display.h"
 #include <stdio.h>
 #include <string.h>
+#include <conio.h>
 
 /* Screen buffer */
 static char screen_buffer[DISPLAY_HEIGHT][DISPLAY_WIDTH];
@@ -116,6 +118,7 @@ void display_update(void) {
  * Draw status bar (last 4 lines of screen)
  * 
  * Shows: player name, player count, connection status, world ticks
+ * Uses gotoxy for direct screen positioning to avoid scrolling
  */
 void display_draw_status_bar(const char *player_name, uint8_t player_count, 
                              const char *connection_status, uint16_t world_ticks) {
@@ -123,17 +126,21 @@ void display_draw_status_bar(const char *player_name, uint8_t player_count,
         return;
     }
     
-    /* Line 1: Player info */
-    printf("%s | Players:%d | %s\n", player_name, player_count, connection_status);
+    /* Line 20: Player info */
+    gotoxy(0, 20);
+    printf("%-8s P:%d %-9s", player_name, player_count, connection_status);
     
-    /* Line 2: World state */
-    printf("Ticks:%d\n", world_ticks);
+    /* Line 21: World state */
+    gotoxy(0, 21);
+    printf("Ticks:%-5d", world_ticks);
     
-    /* Line 3: Separator */
-    printf("----------------------------------------\n");
+    /* Line 22: Separator */
+    gotoxy(0, 22);
+    printf("----------------------------------------");
     
-    /* Line 4: Command help */
-    printf("WASD=Move Q=Quit A=Attack\n");
+    /* Line 23: Command help */
+    gotoxy(0, 23);
+    printf("WASD=Move Q=Quit A=Attack");
 }
 
 /**

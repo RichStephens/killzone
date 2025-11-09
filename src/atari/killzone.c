@@ -257,14 +257,13 @@ void handle_state_playing(void) {
         }
     }
     
-    /* Display status bar periodically (every 30 frames) */
-    if (frame_count % 30 == 0) {
+    /* Display status bar periodically (every 10 frames) */
+    if (frame_count % 10 == 0) {
         player = (player_state_t *)state_get_local_player();
         if (player) {
             const player_state_t *others = state_get_other_players(&player_count);
             player_count++;  /* Include self */
-            printf("\n%s | Players:%d | CONNECTED | Ticks:%d\n", 
-                   player->id, player_count, state_get_world_ticks());
+            display_draw_status_bar(player->id, player_count, "CONNECTED", state_get_world_ticks());
         }
     }
     
