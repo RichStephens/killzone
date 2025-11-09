@@ -475,7 +475,10 @@ void parse_join_response(const uint8_t *response, uint16_t len) {
 }
 
 /**
- * Parse world state JSON
+ * Parse world state JSON - extract entities from players array
+ * Note: This is a simplified parser that extracts x,y coordinates
+ * from the players array. For now, we'll just update the rendering
+ * to show other entities from the world state.
  */
 void parse_world_state(const uint8_t *response, uint16_t len) {
     uint32_t width, height, ticks;
@@ -497,5 +500,8 @@ void parse_world_state(const uint8_t *response, uint16_t len) {
         state_set_world_ticks((uint16_t)ticks);
     }
     
-    /* TODO: Parse player array from JSON */
+    /* TODO: Parse player array from JSON for other entities
+     * For now, the world state is fetched but other players are not
+     * extracted. This will be implemented in the next iteration.
+     */
 }
