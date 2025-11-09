@@ -26,6 +26,7 @@
 /* Initialization and lifecycle */
 void display_init(void);
 void display_close(void);
+void display_show_welcome(const char *server_name);
 
 /* Rendering */
 void display_clear(void);

@@ -18,7 +18,7 @@ static char screen_buffer[DISPLAY_HEIGHT][DISPLAY_WIDTH];
  */
 void display_init(void) {
     display_clear();
-    printf("\033[2J\033[H");  /* Clear screen and move cursor to top */
+    clrscr();  /* Clear screen using conio */
 }
 
 /**
@@ -26,6 +26,21 @@ void display_init(void) {
  */
 void display_close(void) {
     display_clear();
+}
+
+/**
+ * Show welcome screen
+ */
+void display_show_welcome(const char *server_name) {
+    clrscr();
+    gotoxy(0, 5);
+    printf("  *** KILLZONE ***\n");
+    gotoxy(0, 7);
+    printf("  Connected to KillZONE server\n");
+    gotoxy(0, 8);
+    printf("  %s\n", server_name ? server_name : "localhost:3000");
+    gotoxy(0, 10);
+    printf("  Waiting for game world...\n");
 }
 
 /**
@@ -99,18 +114,16 @@ void display_draw_message(const char *message) {
 /**
  * Update screen display
  * 
- * Copies screen buffer to console
+ * Renders screen buffer to fixed positions using gotoxy
  */
 void display_update(void) {
     uint8_t x, y;
     
-    printf("\033[2J\033[H");  /* Clear screen and move cursor to top */
-    
     for (y = 0; y < DISPLAY_HEIGHT; y++) {
+        gotoxy(0, y);
         for (x = 0; x < DISPLAY_WIDTH; x++) {
             printf("%c", screen_buffer[y][x]);
         }
-        printf("\n");
     }
 }
 

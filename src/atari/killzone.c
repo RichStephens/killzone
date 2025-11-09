@@ -144,26 +144,26 @@ void handle_state_init(void) {
 void handle_state_connecting(void) {
     int16_t bytes_read;
     static int attempt = 0;
+    static int welcome_shown = 0;
     
-    printf("Checking server health (attempt %d)...\n", ++attempt);
-    printf("Connecting to %s:%d\n", SERVER_HOST, SERVER_PORT);
+    /* Show welcome screen once */
+    if (!welcome_shown) {
+        display_show_welcome(SERVER_HOST);
+        welcome_shown = 1;
+    }
     
     bytes_read = kz_network_health_check(response_buffer, RESPONSE_BUFFER_SIZE);
-    printf("Health check returned: %d bytes\n", (int)bytes_read);
     
     if (bytes_read > 0) {
-        printf("Response: %s\n", (const char *)response_buffer);
         /* Check for "status":"healthy" in health check response */
         if (strstr((const char *)response_buffer, "healthy") != NULL) {
-            printf("Server is healthy. Ready to join.\n");
             state_set_current(STATE_JOINING);
         } else {
-            printf("Server response not healthy\n");
             state_set_error("Server response invalid");
             state_set_current(STATE_ERROR);
         }
-    } else {
-        printf("ERROR: No response from server (got %d)\n", (int)bytes_read);
+    } else if (++attempt > 10) {
+        /* Give up after 10 attempts */
         state_set_error("Server not responding");
         state_set_current(STATE_ERROR);
     }
@@ -179,12 +179,19 @@ void handle_state_joining(void) {
     int16_t bytes_read;
     size_t len;
     int i;
+    static int prompt_shown = 0;
     
-    printf("Enter player name (max %d chars): ", PLAYER_NAME_MAX - 1);
+    /* Show prompt once */
+    if (!prompt_shown) {
+        clrscr();
+        gotoxy(0, 5);
+        printf("Enter your player name:\n");
+        gotoxy(0, 7);
+        prompt_shown = 1;
+    }
+    
     fflush(stdout);
     fgets(player_name, sizeof(player_name), stdin);
-    
-    printf("Raw input length: %d\n", (int)strlen(player_name));
     
     /* Remove newline and carriage return */
     len = strlen(player_name);
@@ -209,25 +216,18 @@ void handle_state_joining(void) {
         strcpy(player_name, "Player");
     }
     
-    printf("Name: '%s' (%d chars)\n", player_name, (int)strlen(player_name));
-    
     bytes_read = kz_network_join_player(player_name, response_buffer, RESPONSE_BUFFER_SIZE);
-    printf("Join returned: %d bytes\n", (int)bytes_read);
     
     if (bytes_read > 0) {
-        printf("Response: %s\n", (const char *)response_buffer);
         parse_join_response(response_buffer, (uint16_t)bytes_read);
         
         if (json_is_success((const char *)response_buffer)) {
-            printf("Successfully joined!\n");
             state_set_current(STATE_PLAYING);
         } else {
-            printf("Server rejected join\n");
             state_set_error("Join request failed");
             state_set_current(STATE_ERROR);
         }
     } else {
-        printf("Network error: %d\n", (int)bytes_read);
         state_set_error("Join request failed");
         state_set_current(STATE_ERROR);
     }
@@ -240,12 +240,14 @@ void handle_state_joining(void) {
  */
 void handle_state_playing(void) {
     static int frame_count = 0;
-    static int world_update_timer = 0;
+    static int world_rendered = 0;
     int16_t bytes_read;
     int c;
     const char *direction = NULL;
     player_state_t *player;
     uint8_t player_count;
+    uint8_t x, y, i;
+    const player_state_t *others;
     
     /* Get world state periodically (every 10 frames) */
     if (frame_count++ % 10 == 0) {
@@ -253,18 +255,46 @@ void handle_state_playing(void) {
         
         if (bytes_read > 0) {
             parse_world_state(response_buffer, (uint16_t)bytes_read);
-            printf("World state updated\n");
+            world_rendered = 0;  /* Force re-render */
         }
     }
     
-    /* Display status bar periodically (every 10 frames) */
-    if (frame_count % 10 == 0) {
-        player = (player_state_t *)state_get_local_player();
-        if (player) {
-            const player_state_t *others = state_get_other_players(&player_count);
-            player_count++;  /* Include self */
-            display_draw_status_bar(player->id, player_count, "CONNECTED", state_get_world_ticks());
+    /* Render game world */
+    if (!world_rendered) {
+        clrscr();
+        /* Draw the game world */
+        for (y = 0; y < DISPLAY_HEIGHT; y++) {
+            gotoxy(0, y);
+            for (x = 0; x < DISPLAY_WIDTH; x++) {
+                printf(".");
+            }
         }
+        
+        /* Draw local player as @ */
+        player = (player_state_t *)state_get_local_player();
+        if (player && player->x < DISPLAY_WIDTH && player->y < DISPLAY_HEIGHT) {
+            gotoxy(player->x, player->y);
+            printf("@");
+        }
+        
+        /* Draw other players as * */
+        others = state_get_other_players(&player_count);
+        for (i = 0; i < player_count; i++) {
+            if (others[i].x < DISPLAY_WIDTH && others[i].y < DISPLAY_HEIGHT) {
+                gotoxy(others[i].x, others[i].y);
+                printf("*");
+            }
+        }
+        
+        world_rendered = 1;
+    }
+    
+    /* Display status bar */
+    player = (player_state_t *)state_get_local_player();
+    if (player) {
+        const player_state_t *others = state_get_other_players(&player_count);
+        player_count++;  /* Include self */
+        display_draw_status_bar(player->id, player_count, "CONNECTED", state_get_world_ticks());
     }
     
     /* Check for keyboard input (non-blocking) */
@@ -281,26 +311,29 @@ void handle_state_playing(void) {
             case 'w':
             case 'W':
             case 'k':  /* vi-style up */
+            case 28:   /* Atari up arrow */
                 direction = "up";
                 break;
             case 's':
             case 'S':
             case 'j':  /* vi-style down */
+            case 29:   /* Atari down arrow */
                 direction = "down";
                 break;
             case 'a':
             case 'A':
             case 'h':  /* vi-style left */
+            case 30:   /* Atari left arrow */
                 direction = "left";
                 break;
             case 'd':
             case 'D':
             case 'l':  /* vi-style right */
+            case 31:   /* Atari right arrow */
                 direction = "right";
                 break;
             case 'q':
             case 'Q':
-                printf("Leaving game...\n");
                 kz_network_leave_player(player->id, response_buffer, RESPONSE_BUFFER_SIZE);
                 state_set_current(STATE_INIT);
                 return;
@@ -310,29 +343,18 @@ void handle_state_playing(void) {
         
         /* Send movement command if valid */
         if (direction) {
-            printf("Moving %s...\n", direction);
             bytes_read = kz_network_move_player(player->id, direction, response_buffer, RESPONSE_BUFFER_SIZE);
             
             if (bytes_read > 0) {
-                printf("Move response: %d bytes\n", (int)bytes_read);
                 /* Parse response to check for combat */
                 if (strstr((const char *)response_buffer, "combat") != NULL) {
-                    printf("Combat occurred!\n");
+                    /* Combat occurred - will be handled on next world state update */
                 }
-            } else {
-                printf("Move failed: %d\n", (int)bytes_read);
+                world_rendered = 0;  /* Force re-render after move */
             }
         }
     }
     
-    /* Display status periodically */
-    if (frame_count % 30 == 0) {
-        player = (player_state_t *)state_get_local_player();
-        if (player) {
-            printf("Player: %s at (%d, %d) HP: %d\n", 
-                   player->id, player->x, player->y, player->health);
-        }
-    }
 }
 
 /**
