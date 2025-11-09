@@ -17,9 +17,17 @@ A distributed multiplayer game system consisting of a Node.js REST API server an
 
 - **Node.js** - For server (https://nodejs.org/)
 - **cc65 Toolchain** - For client compilation (https://cc65.github.io/)
-- **Atari 800 Emulator** - At `~/atari800` (https://atari800.sourceforge.io/)
+- **Atari 800 Emulator** - At `~/atari800SIO` with `-netsio` support (https://atari800.sourceforge.io/)
 
 ### Setup
+
+**Automated Test (Recommended)**
+```bash
+# Builds server and client, starts both, and runs the game
+./RUN_TEST.sh
+```
+
+**Manual Setup**
 
 **Terminal 1: Start Server**
 ```bash
@@ -31,9 +39,8 @@ npm start
 
 **Terminal 2: Build and Run Client**
 ```bash
-cd client
-make
-~/atari800 build/client.bin
+make disk
+~/atari800SIO -netsio build/killzone.atari
 ```
 
 **Terminal 3: Run Tests (optional)**
@@ -71,23 +78,25 @@ npm test
 - `POST /api/player/leave` - Unregister player
 - `POST /api/player/:id/attack` - Initiate combat (optional)
 
-### Client (`client/`)
+### Client (`src/atari/`)
 
 **Technology**: C compiled with cc65 for Atari 8-bit
 
 **Responsibilities**:
-- Joystick input handling
+- Keyboard input handling (arrow keys, WASD, hjkl)
 - HTTP communication with server via FujiNet
 - Local state representation
-- Display rendering on Atari screen
+- Display rendering on Atari screen (40x24 text mode)
 - Network error handling and recovery
+- JSON parsing of server responses
 
 **Key Modules**:
-- `main.c` - Game loop and state machine
+- `killzone.c` - Main game loop and state machine
 - `network.c/h` - FujiNet HTTP wrapper
-- `input.c/h` - Joystick input handler
-- `graphics.c/h` - Display rendering
+- `display.c/h` - Text-based display rendering
 - `state.c/h` - Local client state management
+- `json.c/h` - JSON response parser
+- `debug.h` - Debug output control flag
 
 ## Development Workflow
 
@@ -97,19 +106,22 @@ npm test
 - Unit tests for world and player systems
 - Client build system with cc65
 
-### Phase 2: Player Management & Authentication (In Progress)
+### Phase 2: Player Management & Authentication ✓
 - Player join/leave endpoints
 - Player state tracking
-- Display system
+- Display system (40x20 game world)
 - Multi-player scenarios
+- FujiNet HTTP integration with proper headers
 
-### Phase 3: Movement & Real-Time Synchronization
-- Movement validation and bounds checking
-- Collision detection
-- World state synchronization
-- Joystick input handling
+### Phase 3: Movement & Real-Time Synchronization ✓
+- Arrow key input handling (WASD, hjkl, Atari arrows)
+- Movement command submission to server
+- Real-time world state polling
+- Game world rendering (dots, @, *)
+- Status bar display (player name, count, connection, ticks)
+- Clean screen output (all debug removed)
 
-### Phase 4: Combat System
+### Phase 4: Combat System (Next)
 - Combat trigger on collision
 - Winner determination
 - Loser removal and respawn
@@ -163,13 +175,32 @@ make
 - **Combat**: Automatic 50/50 random winner determination
 - **Respawn**: Loser can rejoin with new player ID
 
+## Atari Client Display & Controls
+
+### Screen Layout
+- **Lines 0-19**: Game world (40x20 grid)
+  - `.` = Empty space
+  - `@` = Local player
+  - `*` = Other players
+- **Lines 20-23**: Status bar
+  - Player name, player count, connection status
+  - World ticks counter
+  - Command help
+
+### Controls
+- **Arrow Keys** - Move in cardinal directions
+- **WASD** - Alternative movement (W=up, A=left, S=down, D=right)
+- **hjkl** - Vi-style movement (h=left, j=down, k=up, l=right)
+- **Q** - Quit game and disconnect
+
 ## Project Structure
 
 ```
 killzone/
 ├── README.md                    # This file
-├── claude.md                    # Detailed project specification
-├── zoneserver/
+├── Makefile                     # Main build system
+├── RUN_TEST.sh                  # Automated test script
+├── zoneserver/                  # Node.js server
 │   ├── package.json
 │   ├── src/
 │   │   ├── server.js            # Express server entry point
@@ -188,19 +219,21 @@ killzone/
 │   │   └── integration.test.js
 │   └── README.md                # Server documentation
 │
-├── client/
+├── src/atari/                   # Atari 8-bit client
 │   ├── Makefile                 # cc65 build system
-│   ├── main.c                   # Main game loop
+│   ├── killzone.c               # Main game loop
 │   ├── network.c/h              # FujiNet HTTP wrapper
-│   ├── input.c/h                # Joystick input handler
-│   ├── graphics.c/h             # Display rendering
+│   ├── display.c/h              # Text-based display
 │   ├── state.c/h                # Local state management
-│   ├── fujinet.h                # FujiNet library interface
+│   ├── json.c/h                 # JSON parser
+│   ├── debug.h                  # Debug output control
+│   ├── hello.c/h                # Utilities
 │   ├── build/                   # Build artifacts
-│   │   └── client.bin           # Final Atari executable
-│   ├── tests/
-│   │   └── validate.sh          # Validation script
+│   │   └── killzone.atari       # Final Atari executable
 │   └── README.md                # Client documentation
+│
+└── bounce-world-client/         # Reference implementation
+    └── src/atari/               # Example Atari code
 ```
 
 ## API Contract
@@ -226,6 +259,7 @@ killzone/
     {"id": "player_1", "x": 5, "y": 5, "health": 100, "status": "alive"},
     {"id": "player_2", "x": 35, "y": 15, "health": 80, "status": "alive"}
   ],
+  "ticks": 42,
   "timestamp": 1234567890
 }
 ```
