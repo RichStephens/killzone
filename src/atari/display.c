@@ -131,29 +131,29 @@ void display_update(void) {
  * Draw status bar (last 4 lines of screen)
  * 
  * Shows: player name, player count, connection status, world ticks
- * Uses gotoxy for direct screen positioning to avoid scrolling
+ * Uses cputsxy for direct character placement without scrolling
  */
 void display_draw_status_bar(const char *player_name, uint8_t player_count, 
                              const char *connection_status, uint16_t world_ticks) {
+    static char line_buf[41];
+    
     if (!player_name || !connection_status) {
         return;
     }
     
     /* Line 20: Player info */
-    gotoxy(0, 20);
-    printf("%-8s P:%d %-9s", player_name, player_count, connection_status);
+    snprintf(line_buf, sizeof(line_buf), "%s P:%d %s", player_name, player_count, connection_status);
+    cputsxy(0, 20, line_buf);
     
     /* Line 21: World state */
-    gotoxy(0, 21);
-    printf("Ticks:%-5d", world_ticks);
+    snprintf(line_buf, sizeof(line_buf), "Ticks:%d", world_ticks);
+    cputsxy(0, 21, line_buf);
     
     /* Line 22: Separator */
-    gotoxy(0, 22);
-    printf("----------------------------------------");
+    cputsxy(0, 22, "----------------------------------------");
     
     /* Line 23: Command help */
-    gotoxy(0, 23);
-    printf("WASD=Move Q=Quit A=Attack");
+    cputsxy(0, 23, "WASD=Move Q=Quit A=Attack");
 }
 
 /**
