@@ -164,16 +164,12 @@ void handle_state_joining(void) {
     int16_t bytes_read;
     size_t len;
     int i;
-    static int prompt_shown = 0;
     
-    /* Show prompt once */
-    if (!prompt_shown) {
-        clrscr();
-        gotoxy(0, 5);
-        printf("Enter player name:\n");
-        gotoxy(0, 7);
-        prompt_shown = 1;
-    }
+    /* Show prompt every time we enter joining state */
+    clrscr();
+    gotoxy(0, 5);
+    printf("Enter player name:\n");
+    gotoxy(0, 7);
     
     fflush(stdout);
     fgets(player_name, sizeof(player_name), stdin);
@@ -209,11 +205,12 @@ void handle_state_joining(void) {
         if (json_is_success((const char *)response_buffer)) {
             state_set_current(STATE_PLAYING);
         } else {
-            state_set_error("Join request failed");
+            state_set_error("Server rejected join");
             state_set_current(STATE_ERROR);
         }
     } else {
-        state_set_error("Join request failed");
+        /* bytes_read <= 0 means network error or timeout */
+        state_set_error("Network timeout");
         state_set_current(STATE_ERROR);
     }
 }

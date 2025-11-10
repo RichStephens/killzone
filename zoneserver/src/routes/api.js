@@ -41,6 +41,7 @@ function createApiRoutes(world) {
    */
   router.post('/player/join', (req, res) => {
     const { name } = req.body;
+    console.log(`  📝 Join request received - Name: "${name}", Current players: ${world.getPlayerCount()}`);
 
     // Validate input
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
