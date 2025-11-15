@@ -11,9 +11,12 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* Client version */
+#define CLIENT_VERSION "1.0.0"
+
 /* Server configuration */
-#define SERVER_HOST "fujinet.diller.org"
-#define SERVER_PORT 3000
+#define SERVER_HOST "killzone.diller.org"
+#define SERVER_PORT 80
 #define SERVER_PROTO "HTTP"
 
 /* Network device specification format: N:PROTO://HOST:PORT/PATH */

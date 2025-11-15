@@ -6,6 +6,7 @@
  */
 
 #include "display.h"
+#include "network.h"
 #include <stdio.h>
 #include <string.h>
 #include <conio.h>
@@ -32,14 +33,30 @@ void display_close(void) {
  * Show welcome screen
  */
 void display_show_welcome(const char *server_name) {
+    static char url_buf[60];
+    
     clrscr();
-    gotoxy(0, 5);
+    gotoxy(0, 4);
     printf("  *** KILLZONE ***\n");
-    gotoxy(0, 7);
-    printf("  Connected to KillZONE server\n");
+    gotoxy(0, 5);
+    printf("  Version %s\n", CLIENT_VERSION);
+    gotoxy(0, 6);
+    printf("  @2025 DillerNet Studios\n");
     gotoxy(0, 8);
-    printf("  %s\n", server_name ? server_name : "fujinet.diller.org:3000");
-    gotoxy(0, 10);
+    printf("  Connecting to server:\n");
+    gotoxy(0, 9);
+    
+    /* Build full URL */
+    if (SERVER_PORT == 80) {
+        snprintf(url_buf, sizeof(url_buf), "  %s://%s", 
+                 SERVER_PROTO, SERVER_HOST);
+    } else {
+        snprintf(url_buf, sizeof(url_buf), "  %s://%s:%d", 
+                 SERVER_PROTO, SERVER_HOST, SERVER_PORT);
+    }
+    printf("%s\n", url_buf);
+    
+    gotoxy(0, 11);
     printf("  Waiting for game world...\n");
 }
 
