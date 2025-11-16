@@ -279,6 +279,7 @@ void handle_state_playing(void) {
     const char *loser_start;
     uint32_t new_x, new_y;
     char entity_char;
+    const char *status;
     
     /* Get world state periodically (every 5 frames) */
     if (frame_count++ % 5 == 0) {
@@ -393,9 +394,10 @@ void handle_state_playing(void) {
     if (frame_count % 10 == 0) {
         player = (player_state_t *)state_get_local_player();
         if (player) {
-            const player_state_t *others = state_get_other_players(&player_count);
+            others = state_get_other_players(&player_count);
             player_count++;  /* Include self */
-            display_draw_status_bar(player->name, player_count, "CONNECTED", state_get_world_ticks());
+            status = state_is_connected() ? "CONNECTED" : "DISCONNECTED";
+            display_draw_status_bar(player->name, player_count, status, state_get_world_ticks());
         }
     }
     
@@ -474,6 +476,40 @@ void handle_state_playing(void) {
             bytes_read = kz_network_move_player(player->id, direction, response_buffer, RESPONSE_BUFFER_SIZE);
             
             if (bytes_read > 0) {
+                /* Check if player was disconnected (404 error - player not found) */
+                if (strstr((const char *)response_buffer, "\"error\":\"Player not found\"") != NULL) {
+                    /* Player was cleaned up on server - mark as disconnected */
+                    state_set_connected(0);
+                    
+                    /* Show disconnection dialog */
+                    clrscr();
+                    gotoxy(0, 8);
+                    printf("  CONNECTION LOST\n");
+                    gotoxy(0, 10);
+                    printf("  You were disconnected from the server.\n");
+                    gotoxy(0, 12);
+                    printf("  Y=Quit  N=Rejoin\n");
+                    gotoxy(0, 14);
+                    printf("  Press a key: ");
+                    
+                    /* Wait for confirmation */
+                    c = cgetc();
+                    if (c == 'y' || c == 'Y') {
+                        /* Really quit - go to init */
+                        state_clear_local_player();
+                        state_set_rejoining(0);
+                        state_set_connected(0);
+                        state_set_current(STATE_INIT);
+                    } else if (c == 'n' || c == 'N') {
+                        /* Rejoin with saved name */
+                        state_set_rejoining(1);
+                        state_set_connected(0);
+                        state_clear_other_players();
+                        state_set_current(STATE_JOINING);
+                    }
+                    return;
+                }
+                
                 /* Parse new position from response */
                 if (json_get_uint((const char *)response_buffer, "x", &new_x) && 
                     json_get_uint((const char *)response_buffer, "y", &new_y)) {

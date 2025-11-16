@@ -49,6 +49,10 @@ typedef enum {
 void state_set_rejoining(int rejoining);
 int state_is_rejoining(void);
 
+/* Connection state */
+void state_set_connected(int connected);
+int state_is_connected(void);
+
 /* Initialization and lifecycle */
 void state_init(void);
 void state_close(void);

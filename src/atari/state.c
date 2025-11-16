@@ -17,6 +17,7 @@ static uint8_t world_height = 20;
 static uint16_t world_ticks = 0;
 static char error_message[128];
 static int is_rejoining = 0;
+static int is_connected = 1;  /* Track connection state (1=connected, 0=disconnected) */
 
 /**
  * Initialize state system
@@ -64,6 +65,20 @@ void state_set_rejoining(int rejoining) {
  */
 int state_is_rejoining(void) {
     return is_rejoining;
+}
+
+/**
+ * Set connection state
+ */
+void state_set_connected(int connected) {
+    is_connected = connected;
+}
+
+/**
+ * Get connection state
+ */
+int state_is_connected(void) {
+    return is_connected;
 }
 
 /**
