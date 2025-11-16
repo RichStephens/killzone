@@ -220,6 +220,9 @@ void handle_state_joining(void) {
  * 
  * Main gameplay loop with input and movement
  */
+/* Module-level flag for screen refresh */
+static int force_screen_refresh = 0;
+
 void handle_state_playing(void) {
     static int frame_count = 0;
     static uint8_t last_player_x = 255;
@@ -250,9 +253,15 @@ void handle_state_playing(void) {
     /* Render game world */
     player = (player_state_t *)state_get_local_player();
     if (player && player->x < 255 && player->y < 255) {
-        /* Full redraw on first render or when player count changes (rejoin detection) */
+        /* Full redraw on first render or when player count changes (rejoin detection) or when refresh requested */
         static int world_rendered = 0;
         others = state_get_other_players(&player_count);
+        
+        /* Check if refresh was requested */
+        if (force_screen_refresh) {
+            world_rendered = 0;
+            force_screen_refresh = 0;
+        }
         
         if (!world_rendered || (last_other_count != 255 && last_other_count != player_count)) {
             clrscr();
@@ -374,6 +383,11 @@ void handle_state_playing(void) {
             case 31:   /* Atari right arrow */
                 direction = "right";
                 break;
+            case 'r':
+            case 'R':
+                /* Trigger full screen redraw */
+                force_screen_refresh = 1;
+                return;
             case 'q':
             case 'Q':
                 kz_network_leave_player(player->id, response_buffer, RESPONSE_BUFFER_SIZE);
@@ -498,12 +512,13 @@ void handle_state_dead(void) {
         c = cgetc();
         if (c == 'y' || c == 'Y') {
             shown = 0;
-            /* Clear local player state for fresh rejoin */
-            state_clear_local_player();
+            /* Keep player name but clear other state for rejoin */
             state_clear_other_players();
+            /* Server will restore same player ID, just rejoin with same name */
             state_set_current(STATE_JOINING);
         } else if (c == 'n' || c == 'N') {
             shown = 0;
+            state_clear_local_player();
             state_set_current(STATE_INIT);
         }
     }

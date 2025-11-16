@@ -52,42 +52,67 @@ function createApiRoutes(world) {
       });
     }
 
-    // Generate player ID
-    const playerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Check if this player was previously disconnected
+    const disconnectedPlayer = world.getDisconnectedPlayer(name);
+    let player;
+    let isReconnect = false;
 
-    // Generate random spawn position
-    let x, y;
-    let attempts = 0;
-    do {
-      x = Math.floor(Math.random() * world.width);
-      y = Math.floor(Math.random() * world.height);
-      attempts++;
-    } while (world.getPlayerAtPosition(x, y) !== null && attempts < 10);
-
-    // Check if this is a rejoining player
-    const isRejoin = world.isRejoiningPlayer(name);
-
-    // Create and add player
-    const player = new Player(playerId, name, x, y);
-    world.addPlayer(player);
-
-    // Broadcast join/rejoin message
-    if (isRejoin) {
+    if (disconnectedPlayer) {
+      // Restore existing player with their original ID
+      player = disconnectedPlayer;
+      
+      // Reset player state for rejoin
+      player.status = 'alive';
+      player.health = 100;
+      
+      // Generate new spawn position
+      let x, y;
+      let attempts = 0;
+      do {
+        x = Math.floor(Math.random() * world.width);
+        y = Math.floor(Math.random() * world.height);
+        attempts++;
+      } while (world.getPlayerAtPosition(x, y) !== null && attempts < 10);
+      
+      player.setPosition(x, y);
+      
+      // Remove from disconnected and add back to active players
+      world.removeDisconnectedPlayer(name);
+      world.addPlayer(player);
+      
+      isReconnect = true;
       world.setRejoinMessage(name);
-      console.log(`  🔄 Player rejoined: "${name}" (ID: ${playerId}) at position (${x}, ${y}) - Total players: ${world.getPlayerCount()}`);
+      console.log(`  🔄 Player reconnected: "${name}" (ID: ${player.id}) at position (${x}, ${y}) - Total players: ${world.getPlayerCount()}`);
     } else {
+      // New player - generate fresh ID
+      const playerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Generate random spawn position
+      let x, y;
+      let attempts = 0;
+      do {
+        x = Math.floor(Math.random() * world.width);
+        y = Math.floor(Math.random() * world.height);
+        attempts++;
+      } while (world.getPlayerAtPosition(x, y) !== null && attempts < 10);
+
+      // Create new player
+      player = new Player(playerId, name, x, y);
+      world.addPlayer(player);
+      
       world.setJoinMessage(name);
       console.log(`  👤 Player joined: "${name}" (ID: ${playerId}) at position (${x}, ${y}) - Total players: ${world.getPlayerCount()}`);
     }
 
     res.status(201).json({
       success: true,
-      id: playerId,
-      name: name,
-      x: x,
-      y: y,
+      id: player.id,
+      name: player.name,
+      x: player.x,
+      y: player.y,
       health: player.health,
       status: player.status,
+      reconnect: isReconnect,
       world: world.getState()
     });
   });

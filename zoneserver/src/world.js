@@ -14,6 +14,7 @@ class World {
     this.height = height;
     this.players = new Map(); // playerId -> Player object
     this.mobs = new Map(); // mobId -> Mob object
+    this.disconnectedPlayers = new Map(); // playerName -> Player object (for reconnection)
     this.timestamp = Date.now();
     this.ticks = 0;
     this.lastCombatLog = '';
@@ -50,16 +51,38 @@ class World {
   }
 
   /**
-   * Remove a player from the world
+   * Remove a player from the world (move to disconnected for later reconnection)
    * @param {string} playerId - ID of player to remove
    * @returns {boolean} - Success status
    */
   removePlayer(playerId) {
-    const removed = this.players.delete(playerId);
-    if (removed) {
+    const player = this.players.get(playerId);
+    if (player) {
+      // Store in disconnected players by name for reconnection
+      this.disconnectedPlayers.set(player.name, player);
+      this.players.delete(playerId);
       this.timestamp = Date.now();
+      return true;
     }
-    return removed;
+    return false;
+  }
+
+  /**
+   * Get a disconnected player by name
+   * @param {string} playerName - Name of player to retrieve
+   * @returns {Player|null} - Player object or null if not found
+   */
+  getDisconnectedPlayer(playerName) {
+    return this.disconnectedPlayers.get(playerName) || null;
+  }
+
+  /**
+   * Remove a player from disconnected list (when they reconnect)
+   * @param {string} playerName - Name of player to remove
+   * @returns {boolean} - Success status
+   */
+  removeDisconnectedPlayer(playerName) {
+    return this.disconnectedPlayers.delete(playerName);
   }
 
   /**

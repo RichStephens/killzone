@@ -173,7 +173,7 @@ void display_draw_status_bar(const char *player_name, uint8_t player_count,
     cputsxy(0, 22, "----------------------------------------");
     
     /* Line 23: Command help */
-    cputsxy(0, 23, "WASD=Move Q=Quit Collide=Fight");
+    cputsxy(0, 23, "WASD=Move R=Refresh Q=Quit");
 }
 
 /**
