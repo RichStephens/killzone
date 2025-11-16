@@ -164,8 +164,47 @@ void handle_state_joining(void) {
     int16_t bytes_read;
     size_t len;
     int i;
+    const player_state_t *existing_player;
     
-    /* Show prompt every time we enter joining state */
+    /* Check if we're rejoining with existing player name */
+    if (state_is_rejoining()) {
+        existing_player = state_get_local_player();
+        if (existing_player && existing_player->name[0] != '\0') {
+            /* Use existing player name for automatic rejoin */
+            strncpy(player_name, existing_player->name, sizeof(player_name) - 1);
+            player_name[sizeof(player_name) - 1] = '\0';
+            
+            /* Show rejoining message */
+            clrscr();
+            gotoxy(0, 8);
+            printf("  Rejoining as: %s\n", player_name);
+            gotoxy(0, 10);
+            printf("  Please wait...\n");
+            
+            /* Clear rejoining flag */
+            state_set_rejoining(0);
+            
+            /* Send join request immediately */
+            bytes_read = kz_network_join_player(player_name, response_buffer, RESPONSE_BUFFER_SIZE);
+            
+            if (bytes_read > 0) {
+                parse_join_response(response_buffer, (uint16_t)bytes_read);
+                
+                if (json_is_success((const char *)response_buffer)) {
+                    state_set_current(STATE_PLAYING);
+                } else {
+                    state_set_error("Rejoin failed");
+                    state_set_current(STATE_ERROR);
+                }
+            } else {
+                state_set_error("Rejoin request failed");
+                state_set_current(STATE_ERROR);
+            }
+            return;
+        }
+    }
+    
+    /* Normal join flow - prompt for name */
     clrscr();
     gotoxy(0, 5);
     printf("Enter player name:\n");
@@ -512,13 +551,16 @@ void handle_state_dead(void) {
         c = cgetc();
         if (c == 'y' || c == 'Y') {
             shown = 0;
-            /* Keep player name but clear other state for rejoin */
+            /* Set rejoining flag - this tells STATE_JOINING to use saved name */
+            state_set_rejoining(1);
+            /* Keep player name and clear other state for rejoin */
             state_clear_other_players();
-            /* Server will restore same player ID, just rejoin with same name */
+            /* Server will restore same player ID using saved name */
             state_set_current(STATE_JOINING);
         } else if (c == 'n' || c == 'N') {
             shown = 0;
             state_clear_local_player();
+            state_set_rejoining(0);
             state_set_current(STATE_INIT);
         }
     }

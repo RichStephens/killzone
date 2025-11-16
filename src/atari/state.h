@@ -44,6 +44,10 @@ typedef enum {
     STATE_ERROR = 5
 } client_state_t;
 
+/* Rejoin flag */
+void state_set_rejoining(int rejoining);
+int state_is_rejoining(void);
+
 /* Initialization and lifecycle */
 void state_init(void);
 void state_close(void);

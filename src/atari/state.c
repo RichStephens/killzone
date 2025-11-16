@@ -16,6 +16,7 @@ static uint8_t world_width = 40;
 static uint8_t world_height = 20;
 static uint16_t world_ticks = 0;
 static char error_message[128];
+static int is_rejoining = 0;
 
 /**
  * Initialize state system
@@ -49,6 +50,20 @@ client_state_t state_get_current(void) {
  */
 void state_set_current(client_state_t new_state) {
     current_state = new_state;
+}
+
+/**
+ * Set rejoining flag
+ */
+void state_set_rejoining(int rejoining) {
+    is_rejoining = rejoining;
+}
+
+/**
+ * Get rejoining flag
+ */
+int state_is_rejoining(void) {
+    return is_rejoining;
 }
 
 /**
