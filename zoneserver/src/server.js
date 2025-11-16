@@ -35,6 +35,10 @@ app.use((req, res, next) => {
   const method = req.method.padEnd(6);
   const path = req.path;
   
+  // Get client IP (handle proxies and direct connections)
+  const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+  const ipOnly = clientIp.split(',')[0].trim();  // Get first IP if multiple
+  
   // Condensed logging for /state requests (they're frequent)
   const isStateRequest = path === '/world/state' || path.includes('/world/state');
   
@@ -46,9 +50,9 @@ app.use((req, res, next) => {
     logMsg += ` | Body: ${JSON.stringify(req.body)}`;
   }
   
-  // For state requests, use condensed format
+  // For state requests, use condensed format with client IP
   if (isStateRequest) {
-    logMsg += ' [state]';
+    logMsg += ` [state] from ${ipOnly}`;
   }
   
   console.log(logMsg);
