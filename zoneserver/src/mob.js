@@ -17,6 +17,8 @@ class Mob {
     this.isHunter = isHunter;  // Special hunter mob with AI
     this.moveCounter = 0;
     this.moveInterval = Math.floor(Math.random() * 3) + 2; // Move every 2-4 ticks
+    this.huntMoveCounter = 0;  // Counter for slowed hunting movement
+    this.huntMoveInterval = 3;  // Move every 3 ticks when hunting (slower than normal)
   }
 
   /**
@@ -25,13 +27,29 @@ class Mob {
    * @param {number} worldHeight - World height boundary
    */
   /**
-   * Move toward target using Manhattan distance
+   * Move toward target using Manhattan distance (with optional slowdown for hunting)
    * @param {number} targetX - Target X coordinate
    * @param {number} targetY - Target Y coordinate
    * @param {number} worldWidth - World width boundary
    * @param {number} worldHeight - World height boundary
+   * @param {boolean} slowHunt - If true, apply slowdown when very close (within 3 squares)
+   * @returns {boolean} - True if actually moved, false if slowed down
    */
-  moveToward(targetX, targetY, worldWidth, worldHeight) {
+  moveToward(targetX, targetY, worldWidth, worldHeight, slowHunt = false) {
+    // If slowHunt is enabled and target is very close, apply slowdown
+    if (slowHunt) {
+      const distance = Math.abs(this.x - targetX) + Math.abs(this.y - targetY);
+      
+      // Within 3 squares: apply slowdown (move every 3 ticks instead of every tick)
+      if (distance <= 3) {
+        this.huntMoveCounter++;
+        if (this.huntMoveCounter < this.huntMoveInterval) {
+          return false;  // Don't move this tick
+        }
+        this.huntMoveCounter = 0;  // Reset counter
+      }
+    }
+    
     const dx = targetX - this.x;
     const dy = targetY - this.y;
     
@@ -53,6 +71,7 @@ class Mob {
     
     this.x = newX;
     this.y = newY;
+    return true;  // Actually moved
   }
 
   moveRandom(worldWidth, worldHeight) {

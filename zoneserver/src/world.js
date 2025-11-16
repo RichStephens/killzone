@@ -284,8 +284,8 @@ class World {
             }
             this.setLastCombat(combatResult);
           } else {
-            // Not adjacent, move toward player
-            mob.moveToward(nearestPlayer.x, nearestPlayer.y, this.width, this.height);
+            // Not adjacent, move toward player with slowdown when very close
+            mob.moveToward(nearestPlayer.x, nearestPlayer.y, this.width, this.height, true);
           }
         } else {
           // No player in range, move randomly
