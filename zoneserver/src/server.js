@@ -36,7 +36,7 @@ app.use((req, res, next) => {
   const path = req.path;
   
   // Skip verbose logging for /state requests (they're frequent)
-  const isStateRequest = path === '/world/state';
+  const isStateRequest = path === '/world/state' || path.includes('/world/state');
   
   // Log request details (skip for state requests)
   if (!isStateRequest) {
