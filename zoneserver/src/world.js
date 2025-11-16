@@ -37,6 +37,7 @@ class World {
     if (!player || !player.id) {
       return false;
     }
+    player.lastActivity = Date.now();  // Track activity for disconnect cleanup
     this.players.set(player.id, player);
     // Track player name for rejoin detection
     if (player.name) {
@@ -44,6 +45,28 @@ class World {
     }
     this.timestamp = Date.now();
     return true;
+  }
+
+  updatePlayerActivity(playerId) {
+    const player = this.players.get(playerId);
+    if (player) {
+      player.lastActivity = Date.now();
+    }
+  }
+
+  cleanupInactivePlayers(timeoutMs = 120000) {
+    // 120000ms = 2 minutes
+    const now = Date.now();
+    const inactivePlayers = [];
+
+    for (const [playerId, player] of this.players.entries()) {
+      if (now - player.lastActivity > timeoutMs) {
+        inactivePlayers.push({ id: playerId, name: player.name });
+        this.removePlayer(playerId);
+      }
+    }
+
+    return inactivePlayers;
   }
 
   isRejoiningPlayer(playerName) {
@@ -225,12 +248,80 @@ class World {
   }
 
   /**
-   * Update all mobs (move them randomly)
+   * Update all mobs (move them randomly or toward players)
    */
   updateMobs() {
     for (const mob of this.mobs.values()) {
-      mob.moveRandom(this.width, this.height);
+      if (mob.isHunter) {
+        // Hunter mob: look for nearby players
+        let nearestPlayer = null;
+        let nearestDistance = Infinity;
+        
+        for (const player of this.players.values()) {
+          const distance = Math.abs(mob.x - player.x) + Math.abs(mob.y - player.y);
+          if (distance <= 10 && distance < nearestDistance) {
+            nearestPlayer = player;
+            nearestDistance = distance;
+          }
+        }
+        
+        if (nearestPlayer) {
+          // Move toward nearest player
+          mob.moveToward(nearestPlayer.x, nearestPlayer.y, this.width, this.height);
+        } else {
+          // No player in range, move randomly
+          mob.moveRandom(this.width, this.height);
+        }
+      } else {
+        // Regular mob: move randomly
+        mob.moveRandom(this.width, this.height);
+      }
     }
+  }
+
+  /**
+   * Ensure minimum mob count, spawn new ones if needed
+   * @param {number} minMobs - Minimum number of mobs to maintain
+   * @returns {Array} - Array of newly spawned mobs
+   */
+  respawnMobs(minMobs = 3) {
+    const spawnedMobs = [];
+    const currentCount = this.mobs.size;
+    
+    if (currentCount < minMobs) {
+      const toSpawn = minMobs - currentCount;
+      
+      for (let i = 0; i < toSpawn; i++) {
+        // Generate random position
+        let x, y;
+        let attempts = 0;
+        do {
+          x = Math.floor(Math.random() * this.width);
+          y = Math.floor(Math.random() * this.height);
+          attempts++;
+        } while (this.getPlayerAtPosition(x, y) !== null && attempts < 10);
+        
+        // Determine if this should be a hunter mob
+        // Only one hunter at a time - check if one exists
+        let hasHunter = false;
+        for (const mob of this.mobs.values()) {
+          if (mob.isHunter) {
+            hasHunter = true;
+            break;
+          }
+        }
+        
+        const isHunter = !hasHunter && i === 0;  // First spawn is hunter if none exists
+        const mobId = `mob_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const mobName = isHunter ? 'Hunter' : `Goblin${currentCount + i + 1}`;
+        
+        const mob = new (require('./mob'))(mobId, mobName, x, y, isHunter);
+        this.addMob(mob);
+        spawnedMobs.push(mob);
+      }
+    }
+    
+    return spawnedMobs;
   }
 
   /**

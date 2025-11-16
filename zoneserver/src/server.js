@@ -18,20 +18,8 @@ const world = new World(40, 20);
 
 // Spawn initial mobs for testing multi-player rendering
 function spawnMobs() {
-  const mobNames = ['Goblin', 'Orc', 'Troll', 'Skeleton', 'Ghost'];
-  const numMobs = 3;
-  
-  for (let i = 0; i < numMobs; i++) {
-    const x = Math.floor(Math.random() * world.width);
-    const y = Math.floor(Math.random() * world.height);
-    const mobId = `mob_${Date.now()}_${i}`;
-    const mobName = mobNames[i % mobNames.length];
-    
-    const mob = new Mob(mobId, x, y, mobName);
-    world.addMob(mob);
-  }
-  
-  console.log(`🎮 Spawned ${numMobs} mobs for testing`);
+  world.respawnMobs(3);
+  console.log(`🎮 Spawned initial mobs`);
 }
 
 // Create Express app
@@ -99,6 +87,26 @@ if (process.env.NODE_ENV !== 'test') {
     
     // Spawn mobs for testing
     spawnMobs();
+    
+    // Server maintenance loop
+    setInterval(() => {
+      // Every 100 ticks: respawn mobs if needed
+      if (world.ticks % 100 === 0) {
+        const spawnedMobs = world.respawnMobs(3);
+        if (spawnedMobs.length > 0) {
+          const hunterInfo = spawnedMobs.some(m => m.isHunter) ? ' (including Hunter)' : '';
+          console.log(`  🎮 Respawned ${spawnedMobs.length} mobs${hunterInfo}`);
+        }
+      }
+      
+      // Every 30 seconds: clean up inactive players (2 min timeout)
+      if (world.ticks % 600 === 0) {
+        const inactivePlayers = world.cleanupInactivePlayers(120000);
+        if (inactivePlayers.length > 0) {
+          console.log(`  🧹 Cleaned up ${inactivePlayers.length} inactive player(s): ${inactivePlayers.map(p => p.name).join(', ')}`);
+        }
+      }
+    }, 100);  // Check every 100ms
   });
 
   // Graceful shutdown

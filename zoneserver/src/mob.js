@@ -6,16 +6,17 @@
  */
 
 class Mob {
-  constructor(id, x, y, name = 'Mob') {
+  constructor(id, name, x, y, isHunter = false) {
     this.id = id;
+    this.name = name;
     this.x = x;
     this.y = y;
-    this.name = name;
     this.health = 50;
     this.status = 'alive';
+    this.type = 'mob';
+    this.isHunter = isHunter;  // Special hunter mob with AI
     this.moveCounter = 0;
     this.moveInterval = Math.floor(Math.random() * 3) + 2; // Move every 2-4 ticks
-    this.type = 'mob';
   }
 
   /**
@@ -23,6 +24,37 @@ class Mob {
    * @param {number} worldWidth - World width boundary
    * @param {number} worldHeight - World height boundary
    */
+  /**
+   * Move toward target using Manhattan distance
+   * @param {number} targetX - Target X coordinate
+   * @param {number} targetY - Target Y coordinate
+   * @param {number} worldWidth - World width boundary
+   * @param {number} worldHeight - World height boundary
+   */
+  moveToward(targetX, targetY, worldWidth, worldHeight) {
+    const dx = targetX - this.x;
+    const dy = targetY - this.y;
+    
+    let newX = this.x;
+    let newY = this.y;
+    
+    // Prefer moving in the direction with larger distance
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Move horizontally
+      newX = this.x + (dx > 0 ? 1 : -1);
+    } else {
+      // Move vertically
+      newY = this.y + (dy > 0 ? 1 : -1);
+    }
+    
+    // Clamp to world boundaries
+    newX = Math.max(0, Math.min(worldWidth - 1, newX));
+    newY = Math.max(0, Math.min(worldHeight - 1, newY));
+    
+    this.x = newX;
+    this.y = newY;
+  }
+
   moveRandom(worldWidth, worldHeight) {
     this.moveCounter++;
     if (this.moveCounter < this.moveInterval) {

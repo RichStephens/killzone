@@ -32,6 +32,11 @@ function createApiRoutes(world) {
    * Get current world snapshot
    */
   router.get('/world/state', (req, res) => {
+    // Update activity for any player that requests state
+    const playerId = req.query.playerId;
+    if (playerId) {
+      world.updatePlayerActivity(playerId);
+    }
     res.status(200).json(world.getState());
   });
 
@@ -165,6 +170,9 @@ function createApiRoutes(world) {
       });
     }
 
+    // Update player activity
+    world.updatePlayerActivity(playerId);
+    
     // Calculate new position
     let newX = player.x;
     let newY = player.y;
