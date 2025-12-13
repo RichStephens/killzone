@@ -189,8 +189,11 @@ class TcpServer {
     }
 
     handleGetState(socket) {
-        const players = Object.values(this.world.players);
-        const mobs = Object.values(this.world.mobs);
+        // Trigger world update (tick, mob movement, etc)
+        this.world.getState();
+
+        const players = Array.from(this.world.players.values());
+        const mobs = Array.from(this.world.mobs.values());
         const all = [...players, ...mobs];
 
         const count = Math.min(all.length, 255);
