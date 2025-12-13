@@ -17,11 +17,10 @@
 #include "network.h"
 #include "state.h"
 #include "display.h"
+#include "input.h"
 /* json.h is no longer needed as parsing is done in network.c */
 
-/* Game constants */
-#define GAME_TITLE "KillZone"
-#define PLAYER_NAME_MAX 32
+#include "constants.h"
 
 /* Function declarations */
 void game_init(void);
@@ -38,6 +37,7 @@ void handle_state_error(void);
  * Main entry point
  */
 int main(void) {
+    printf("Booting KillZone...\n");
     game_init();
     game_loop();
     game_close();
@@ -50,6 +50,7 @@ int main(void) {
 void game_init(void) {
     state_init();
     display_init();
+    input_init();
     
     if (kz_network_init() != 0) {
         state_set_error("Network initialization failed");
@@ -160,11 +161,7 @@ void handle_state_joining(void) {
             player_name[sizeof(player_name) - 1] = '\0';
             
             /* Show rejoining message */
-            clrscr();
-            gotoxy(0, 8);
-            printf("  Rejoining as: %s\n", player_name);
-            gotoxy(0, 10);
-            printf("  Please wait...\n");
+            display_show_rejoining(player_name);
             
             /* Clear rejoining flag */
             state_set_rejoining(0);
@@ -181,10 +178,7 @@ void handle_state_joining(void) {
     }
     
     /* Normal join flow - prompt for name */
-    clrscr();
-    gotoxy(0, 5);
-    printf("Enter player name:\n");
-    gotoxy(0, 7);
+    display_show_join_prompt();
     
     fflush(stdout);
     fgets(player_name, sizeof(player_name), stdin);
@@ -230,19 +224,14 @@ static int force_screen_refresh = 0;
 
 void handle_state_playing(void) {
     static int frame_count = 0;
-    static uint8_t last_player_x = 255;
-    static uint8_t last_player_y = 255;
-    static uint8_t last_other_positions[MAX_OTHER_PLAYERS * 2];  /* x,y pairs */
-    static uint8_t last_other_count = 255;  /* Track previous player count for rejoin detection */
     int c;
     const char *direction = NULL;
     player_state_t *player;
     uint8_t player_count;
-    uint8_t x, y, i;
     const player_state_t *others;
-    char entity_char;
     const char *status;
     move_result_t move_res;
+    input_cmd_t cmd; /* Moved declaration to top */
     
     /* Get world state periodically (every 5 frames) */
     if (frame_count++ % 5 == 0) {
@@ -253,102 +242,15 @@ void handle_state_playing(void) {
     
     /* Render game world */
     player = (player_state_t *)state_get_local_player();
-    if (player && player->x < 255 && player->y < 255) {
-        /* Full redraw on first render or when player count changes (rejoin detection) or when refresh requested */
-        static int world_rendered = 0;
+    if (player) {
         others = state_get_other_players(&player_count);
         
         /* Check if refresh was requested */
         if (force_screen_refresh) {
-            world_rendered = 0;
             force_screen_refresh = 0;
         }
         
-        if (!world_rendered || (last_other_count != 255 && last_other_count != player_count)) {
-            clrscr();
-            
-            /* Draw world line by line */
-            for (y = 0; y < DISPLAY_HEIGHT; y++) {
-                gotoxy(0, y);
-                for (x = 0; x < DISPLAY_WIDTH; x++) {
-                    printf(".");
-                }
-            }
-            
-            /* Draw other entities - # for players, ^ for hunter mobs, * for regular mobs */
-            for (i = 0; i < player_count; i++) {
-                if (others[i].x < DISPLAY_WIDTH && others[i].y < DISPLAY_HEIGHT) {
-                    gotoxy(others[i].x, others[i].y);
-                    /* Use # for real players, ^ for hunter mobs, * for regular mobs */
-                    if (strcmp(others[i].type, "player") == 0) {
-                        entity_char = '#';
-                    } else if (others[i].isHunter) {
-                        entity_char = '^';
-                    } else {
-                        entity_char = '*';
-                    }
-                    printf("%c", entity_char);
-                }
-            }
-            
-            /* Draw local player as @ */
-            if (player->x < DISPLAY_WIDTH && player->y < DISPLAY_HEIGHT) {
-                gotoxy(player->x, player->y);
-                printf("@");
-            }
-            
-            last_player_x = player->x;
-            last_player_y = player->y;
-            last_other_count = player_count;
-            world_rendered = 1;
-        } else if (player->x != last_player_x || player->y != last_player_y) {
-            /* Incremental update: only redraw changed positions */
-            
-            /* Erase old player position */
-            gotoxy(last_player_x, last_player_y);
-            printf(".");
-            
-            /* Draw new player position */
-            gotoxy(player->x, player->y);
-            printf("@");
-            
-            last_player_x = player->x;
-            last_player_y = player->y;
-        }
-        
-        /* Update other players incrementally */
-        for (i = 0; i < player_count; i++) {
-            uint8_t old_x = last_other_positions[i * 2];
-            uint8_t old_y = last_other_positions[i * 2 + 1];
-            uint8_t new_x_other = others[i].x;
-            uint8_t new_y_other = others[i].y;
-            
-            /* If position changed, update it */
-            if (old_x != new_x_other || old_y != new_y_other) {
-                /* Erase old position (if it was valid) */
-                if (old_x < DISPLAY_WIDTH && old_y < DISPLAY_HEIGHT && (old_x != 0 || old_y != 0)) {
-                    gotoxy(old_x, old_y);
-                    printf(".");
-                }
-                
-                /* Draw new position - # for players, ^ for hunter mobs, * for regular mobs */
-                if (new_x_other < DISPLAY_WIDTH && new_y_other < DISPLAY_HEIGHT) {
-                    gotoxy(new_x_other, new_y_other);
-                    if (strcmp(others[i].type, "player") == 0) {
-                        entity_char = '#';
-                    } else if (others[i].isHunter) {
-                        entity_char = '^';
-                    } else {
-                        entity_char = '*';
-                    }
-                    printf("%c", entity_char);
-                }
-                
-                /* Update tracked position */
-                last_other_positions[i * 2] = new_x_other;
-                last_other_positions[i * 2 + 1] = new_y_other;
-            }
-        }
+        display_render_game(player, others, player_count, force_screen_refresh);
     }
     
     /* Display status bar periodically (every 10 frames) */
@@ -362,75 +264,48 @@ void handle_state_playing(void) {
         }
     }
     
-    /* Check for keyboard input (non-blocking) */
-    if (kbhit()) {
-        c = cgetc();
-        player = (player_state_t *)state_get_local_player();
-        
-        if (!player) {
+    /* Check for input */
+    cmd = input_check();
+    
+    switch (cmd) {
+        case CMD_UP:
+            direction = "up";
+            break;
+        case CMD_DOWN:
+            direction = "down";
+            break;
+        case CMD_LEFT:
+            direction = "left";
+            break;
+        case CMD_RIGHT:
+            direction = "right";
+            break;
+        case CMD_REFRESH:
+            /* Trigger full screen redraw */
+            force_screen_refresh = 1;
             return;
-        }
-        
-        /* Parse movement commands */
-        switch (c) {
-            case 'w':
-            case 'W':
-            case 'k':  /* vi-style up */
-            case 28:   /* Atari up arrow */
-                direction = "up";
-                break;
-            case 's':
-            case 'S':
-            case 'j':  /* vi-style down */
-            case 29:   /* Atari down arrow */
-                direction = "down";
-                break;
-            case 'a':
-            case 'A':
-            case 'h':  /* vi-style left */
-            case 30:   /* Atari left arrow */
-                direction = "left";
-                break;
-            case 'd':
-            case 'D':
-            case 'l':  /* vi-style right */
-            case 31:   /* Atari right arrow */
-                direction = "right";
-                break;
-            case 'r':
-            case 'R':
-                /* Trigger full screen redraw */
-                force_screen_refresh = 1;
-                return;
-            case 'q':
-            case 'Q':
-                /* Show quit confirmation dialog */
-                clrscr();
-                gotoxy(0, 8);
-                printf("  Are you sure you want to quit?\n");
-                gotoxy(0, 10);
-                printf("  Y=Quit  N=Continue Playing\n");
-                gotoxy(0, 12);
-                printf("  Press a key: ");
-                
-                /* Wait for confirmation */
-                c = cgetc();
-                if (c == 'y' || c == 'Y') {
-                    /* Really quit - leave player and go to init */
-                    kz_network_leave_player(player->id);
-                    state_clear_local_player();
-                    state_set_rejoining(0);
-                    state_set_current(STATE_INIT);
-                } else if (c == 'n' || c == 'N') {
-                    /* Don't quit - rejoin with saved name */
-                    state_set_rejoining(1);
-                    state_clear_other_players();
-                    state_set_current(STATE_JOINING);
-                }
-                return;
-            default:
-                break;
-        }
+        case CMD_QUIT:
+            /* Show quit confirmation dialog */
+            display_show_quit_confirmation();
+            
+            /* Wait for confirmation */
+            c = input_wait_key();
+            if (c == 'y' || c == 'Y') {
+                /* Really quit - leave player and go to init */
+                kz_network_leave_player(player->id);
+                state_clear_local_player();
+                state_set_rejoining(0);
+                state_set_current(STATE_INIT);
+            } else if (c == 'n' || c == 'N') {
+                /* Don't quit - rejoin with saved name */
+                state_set_rejoining(1);
+                state_clear_other_players();
+                state_set_current(STATE_JOINING);
+            }
+            return;
+        default:
+            break;
+    }
         
         /* Send movement command if valid */
         if (direction) {
@@ -438,18 +313,10 @@ void handle_state_playing(void) {
                 /* If move failed (e.g. network error) */
                 if (!state_is_connected()) {
                     /* Show disconnection dialog */
-                    clrscr();
-                    gotoxy(0, 8);
-                    printf("  CONNECTION LOST\n");
-                    gotoxy(0, 10);
-                    printf("  You were disconnected from the server.\n");
-                    gotoxy(0, 12);
-                    printf("  Y=Quit  N=Rejoin\n");
-                    gotoxy(0, 14);
-                    printf("  Press a key: ");
+                    display_show_connection_lost();
                     
                     /* Wait for confirmation */
-                    c = cgetc();
+                    c = input_wait_key();
                     if (c == 'y' || c == 'Y') {
                         /* Really quit - go to init */
                         state_clear_local_player();
@@ -498,8 +365,6 @@ void handle_state_playing(void) {
                 }
             }
         }
-    }
-    
 }
 
 /**
@@ -509,37 +374,29 @@ void handle_state_playing(void) {
  */
 void handle_state_dead(void) {
     static int shown = 0;
-    int c;
+    input_cmd_t cmd; /* Moved declaration to top */
     
     /* Show death message once */
     if (!shown) {
-        clrscr();
-        gotoxy(0, 8);
-        printf("  *** YOU WERE KILLED! ***\n");
-        gotoxy(0, 10);
-        printf("  You have been eliminated in combat.\n");
-        gotoxy(0, 12);
-        printf("  Rejoin the game? (Y/N): ");
+        display_show_death_message();
         shown = 1;
     }
     
     /* Check for input */
-    if (kbhit()) {
-        c = cgetc();
-        if (c == 'y' || c == 'Y') {
-            shown = 0;
-            /* Set rejoining flag - this tells STATE_JOINING to use saved name */
-            state_set_rejoining(1);
-            /* Keep player name and clear other state for rejoin */
-            state_clear_other_players();
-            /* Server will restore same player ID using saved name */
-            state_set_current(STATE_JOINING);
-        } else if (c == 'n' || c == 'N') {
-            shown = 0;
-            state_clear_local_player();
-            state_set_rejoining(0);
-            state_set_current(STATE_INIT);
-        }
+    cmd = input_check();
+    if (cmd == CMD_YES) {
+        shown = 0;
+        /* Set rejoining flag - this tells STATE_JOINING to use saved name */
+        state_set_rejoining(1);
+        /* Keep player name and clear other state for rejoin */
+        state_clear_other_players();
+        /* Server will restore same player ID using saved name */
+        state_set_current(STATE_JOINING);
+    } else if (cmd == CMD_NO) {
+        shown = 0;
+        state_clear_local_player();
+        state_set_rejoining(0);
+        state_set_current(STATE_INIT);
     }
 }
 
@@ -549,7 +406,5 @@ void handle_state_dead(void) {
  * Error state - game ends
  */
 void handle_state_error(void) {
-    clrscr();
-    gotoxy(0, 10);
-    printf("ERROR: %s\n", state_get_error());
+    display_show_error(state_get_error());
 }
