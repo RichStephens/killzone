@@ -171,9 +171,9 @@ static uint8_t kz_network_move_player_tcp(const char *player_id, const char *dir
     
     if (network_write(tcp_device_spec, buf, 2) != FN_ERR_OK) return 0;
     
-    /* Resp: 0x02 [X] [Y] [Health] [Collision] */
-    len = network_read(tcp_device_spec, buf, 5);
-    if (len < 5 || buf[0] != 0x02) return 0;
+    /* Resp: 0x02 [X] [Y] [Health] [Collision] [MsgLen] [Msg...] */
+    len = network_read(tcp_device_spec, buf, 6);
+    if (len < 6 || buf[0] != 0x02) return 0;
     
     result->x = buf[1];
     result->y = buf[2];
@@ -187,6 +187,19 @@ static uint8_t kz_network_move_player_tcp(const char *player_id, const char *dir
     
     result->collision = buf[4];
     result->message_count = 0;
+    
+    /* Read battle message if present */
+    {
+        uint8_t msgLen = buf[5];
+        if (msgLen > 0 && msgLen < 40) {
+            len = network_read(tcp_device_spec, buf, msgLen);
+            if (len == msgLen) {
+                memcpy(result->messages[0], buf, msgLen);
+                result->messages[0][msgLen] = '\0';
+                result->message_count = 1;
+            }
+        }
+    }
     
     return 1;
 }

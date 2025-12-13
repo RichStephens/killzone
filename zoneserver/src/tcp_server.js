@@ -154,11 +154,13 @@ class TcpServer {
                 const collidingPlayer = this.world.getPlayerAtPosition(newX, newY, socket.player.id);
                 const collidingMob = this.world.getMobAtPosition(newX, newY);
                 let hadCollision = false;
+                let battleMsg = '';
 
                 if (collidingPlayer) {
                     hadCollision = true;
                     const result = CombatResolver.resolveBattle(socket.player, collidingPlayer);
                     console.log(`  ⚔️  TCP Combat: "${socket.player.name}" vs "${collidingPlayer.name}" - Winner: "${result.finalWinnerName}"`);
+                    battleMsg = `${result.finalWinnerName} defeats ${result.finalLoserName}!`;
                     if (result.finalLoserId === socket.player.id) {
                         this.world.removePlayer(socket.player.id);
                         this.world.setKillMessage(result.finalWinnerName, result.finalLoserName, 'player');
@@ -172,6 +174,7 @@ class TcpServer {
                     hadCollision = true;
                     const result = CombatResolver.resolveBattle(socket.player, collidingMob);
                     console.log(`  ⚔️  TCP Combat: "${socket.player.name}" vs "${collidingMob.name}" - Winner: "${result.finalWinnerName}"`);
+                    battleMsg = `${result.finalWinnerName} defeats ${result.finalLoserName}!`;
                     if (result.finalLoserId === socket.player.id) {
                         this.world.removePlayer(socket.player.id);
                         this.world.setKillMessage(result.finalWinnerName, result.finalLoserName, 'player');
@@ -186,13 +189,21 @@ class TcpServer {
                     console.log(`  🎮 TCP Move: ${socket.player.name} to (${newX}, ${newY})`);
                 }
 
-                // Send State Update back to client: 0x02 [X] [Y] [Health] [Collision]
-                const resp = Buffer.alloc(5);
+                // Truncate message to 39 chars max
+                if (battleMsg.length > 39) {
+                    battleMsg = battleMsg.substring(0, 39);
+                }
+
+                // Send State Update back to client: 0x02 [X] [Y] [Health] [Collision] [MsgLen] [Msg...]
+                const msgBuf = Buffer.from(battleMsg);
+                const resp = Buffer.alloc(6 + msgBuf.length);
                 resp.writeUInt8(0x02, 0); // Type
                 resp.writeUInt8(Math.floor(socket.player.x), 1);
                 resp.writeUInt8(Math.floor(socket.player.y), 2);
                 resp.writeUInt8(socket.player.health, 3);
                 resp.writeUInt8(hadCollision ? 1 : 0, 4); // Collision flag
+                resp.writeUInt8(msgBuf.length, 5);        // Message length
+                msgBuf.copy(resp, 6);
                 socket.write(resp);
             }
         }
