@@ -153,8 +153,11 @@ void display_render_game(const player_state_t *local, const player_state_t *othe
     }
     
     if (!world_rendered || (last_other_count != 255 && last_other_count != count)) {
-        /* Only clear the play field (lines 0-19), NOT the status area (lines 20-23) */
-        /* Draw world line by line - this fills the play area without clrscr */
+        /* On first render, clear entire screen. After that, only clear play field */
+        if (!world_rendered) {
+            clrscr();
+        }
+        /* Draw world line by line - this fills the play area */
         for (y = 0; y < DISPLAY_HEIGHT; y++) {
             gotoxy(0, y);
             for (x = 0; x < DISPLAY_WIDTH; x++) {

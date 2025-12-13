@@ -253,16 +253,26 @@ void handle_state_playing(void) {
         display_render_game(player, others, player_count, do_refresh);
     }
     
-    /* Display status bar periodically (every 10 frames) */
+    /* Display status bar and combat message periodically (every 10 frames) */
     if (frame_count % 10 == 0) {
+        const char *combat_msg;
         player = (player_state_t *)state_get_local_player();
         if (player) {
             others = state_get_other_players(&player_count);
             player_count++;  /* Include self */
             status = state_is_connected() ? "CONNECTED" : "DISCONNECTED";
             display_draw_status_bar(player->name, player_count, status, state_get_world_ticks());
+            
+            /* Display combat message if present */
+            combat_msg = state_get_combat_message();
+            if (combat_msg && combat_msg[0] != '\0') {
+                display_draw_combat_message(combat_msg);
+            }
         }
     }
+    
+    /* Tick combat message counter each frame */
+    state_tick_combat_message();
     
     /* Check for input */
     cmd = input_check();
@@ -337,21 +347,10 @@ void handle_state_playing(void) {
                 player->x = move_res.x;
                 player->y = move_res.y;
                 
-                /* Check if combat occurred */
+                /* Check if combat occurred - message is auto-displayed via state */
                 if (move_res.collision) {
-                    int msg_num;
-                    int delay;
-                    
-                    /* Display combat messages */
-                    for (msg_num = 0; msg_num < move_res.message_count; msg_num++) {
-                        /* Display message on fixed line */
-                        display_draw_combat_message(move_res.messages[msg_num]);
-                        
-                        /* Pause much longer so player can read it */
-                        for (delay = 0; delay < 50000; delay++) {
-                            /* Busy wait */
-                        }
-                    }
+                    /* Message already stored in state by network code */
+                    /* No blocking delay - continues gameplay */
                     
                     /* Check if we lost */
                     if (move_res.loser_id[0] != '\0') {

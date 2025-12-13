@@ -85,6 +85,11 @@ uint16_t state_get_world_ticks(void);
 void state_set_server_version(const char *version);
 const char *state_get_server_version(void);
 
+/* Combat message (auto-clears after frames) */
+void state_set_combat_message(const char *msg);
+const char *state_get_combat_message(void);
+void state_tick_combat_message(void);  /* Call each frame to decrement counter */
+
 /* Error handling */
 void state_set_error(const char *message);
 const char *state_get_error(void);

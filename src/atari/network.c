@@ -197,6 +197,8 @@ static uint8_t kz_network_move_player_tcp(const char *player_id, const char *dir
                 memcpy(result->messages[0], buf, msgLen);
                 result->messages[0][msgLen] = '\0';
                 result->message_count = 1;
+                /* Store in state for non-blocking display */
+                state_set_combat_message(result->messages[0]);
             }
         }
     }
