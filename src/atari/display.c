@@ -152,11 +152,9 @@ void display_render_game(const player_state_t *local, const player_state_t *othe
         world_rendered = 0;
     }
     
-    if (!world_rendered || (last_other_count != 255 && last_other_count != count)) {
-        /* On first render, clear entire screen. After that, only clear play field */
-        if (!world_rendered) {
-            clrscr();
-        }
+    /* Only do full redraw on first render or explicit refresh */
+    if (!world_rendered) {
+        clrscr();
         /* Draw world line by line - this fills the play area */
         for (y = 0; y < DISPLAY_HEIGHT; y++) {
             gotoxy(0, y);
@@ -170,7 +168,7 @@ void display_render_game(const player_state_t *local, const player_state_t *othe
             if (others[i].x < DISPLAY_WIDTH && others[i].y < DISPLAY_HEIGHT) {
                 gotoxy(others[i].x, others[i].y);
                 if (strcmp(others[i].type, "player") == 0) {
-                    entity_char = CHAR_WALL; /* Using # for other players as per original code */
+                    entity_char = CHAR_WALL;
                 } else if (others[i].isHunter) {
                     entity_char = CHAR_HUNTER;
                 } else {
@@ -192,30 +190,50 @@ void display_render_game(const player_state_t *local, const player_state_t *othe
         world_rendered = 1;
         
         /* Initialize tracked positions */
-        for (i = 0; i < count; i++) {
+        for (i = 0; i < count && i < MAX_OTHER_PLAYERS; i++) {
             last_other_positions[i * 2] = others[i].x;
             last_other_positions[i * 2 + 1] = others[i].y;
         }
+        /* Mark remaining slots as invalid */
+        for (i = count; i < MAX_OTHER_PLAYERS; i++) {
+            last_other_positions[i * 2] = 255;
+            last_other_positions[i * 2 + 1] = 255;
+        }
         
-    } else if (local->x != last_player_x || local->y != last_player_y) {
-        /* Incremental update: only redraw changed positions */
+    } else {
+        /* INCREMENTAL UPDATE - no full redraw */
         
-        /* Erase old player position */
-        gotoxy(last_player_x, last_player_y);
-        printf("%c", CHAR_EMPTY);
+        /* If entity count decreased, erase old positions for removed entities */
+        if (count < last_other_count) {
+            for (i = count; i < last_other_count && i < MAX_OTHER_PLAYERS; i++) {
+                uint8_t old_x = last_other_positions[i * 2];
+                uint8_t old_y = last_other_positions[i * 2 + 1];
+                if (old_x < DISPLAY_WIDTH && old_y < DISPLAY_HEIGHT) {
+                    gotoxy(old_x, old_y);
+                    printf("%c", CHAR_EMPTY);
+                }
+                last_other_positions[i * 2] = 255;
+                last_other_positions[i * 2 + 1] = 255;
+            }
+        }
+        last_other_count = count;
         
-        /* Draw new player position */
-        gotoxy(local->x, local->y);
-        printf("%c", CHAR_PLAYER);
+        /* Update player position if changed */
+        if (local->x != last_player_x || local->y != last_player_y) {
+            /* Erase old player position */
+            gotoxy(last_player_x, last_player_y);
+            printf("%c", CHAR_EMPTY);
+            
+            /* Draw new player position */
+            gotoxy(local->x, local->y);
+            printf("%c", CHAR_PLAYER);
+            
+            last_player_x = local->x;
+            last_player_y = local->y;
+        }
         
-        last_player_x = local->x;
-        last_player_y = local->y;
-    }
-    
-    /* Update other players incrementally */
-    /* Only if we didn't do a full redraw */
-    if (world_rendered) {
-        for (i = 0; i < count; i++) {
+        /* Update other entities incrementally */
+        for (i = 0; i < count && i < MAX_OTHER_PLAYERS; i++) {
             uint8_t old_x = last_other_positions[i * 2];
             uint8_t old_y = last_other_positions[i * 2 + 1];
             uint8_t new_x_other = others[i].x;
@@ -223,7 +241,7 @@ void display_render_game(const player_state_t *local, const player_state_t *othe
             
             /* If position changed, update it */
             if (old_x != new_x_other || old_y != new_y_other) {
-                /* Erase old position (if it was valid, i.e. not 255) */
+                /* Erase old position (if valid) */
                 if (old_x < DISPLAY_WIDTH && old_y < DISPLAY_HEIGHT) {
                     gotoxy(old_x, old_y);
                     printf("%c", CHAR_EMPTY);
