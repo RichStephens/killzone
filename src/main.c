@@ -243,14 +243,14 @@ void handle_state_playing(void) {
     /* Render game world */
     player = (player_state_t *)state_get_local_player();
     if (player) {
+        int do_refresh;
         others = state_get_other_players(&player_count);
         
-        /* Check if refresh was requested */
-        if (force_screen_refresh) {
-            force_screen_refresh = 0;
-        }
+        /* Check if refresh was requested - save and reset flag */
+        do_refresh = force_screen_refresh;
+        force_screen_refresh = 0;
         
-        display_render_game(player, others, player_count, force_screen_refresh);
+        display_render_game(player, others, player_count, do_refresh);
     }
     
     /* Display status bar periodically (every 10 frames) */

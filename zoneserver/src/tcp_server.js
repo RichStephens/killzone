@@ -149,9 +149,12 @@ class TcpServer {
                 // Check collisions
                 const collidingPlayer = this.world.getPlayerAtPosition(newX, newY, socket.player.id);
                 const collidingMob = this.world.getMobAtPosition(newX, newY);
+                let hadCollision = false;
 
                 if (collidingPlayer) {
+                    hadCollision = true;
                     const result = CombatResolver.resolveBattle(socket.player, collidingPlayer);
+                    console.log(`  ⚔️  TCP Combat: "${socket.player.name}" vs "${collidingPlayer.name}" - Winner: "${result.finalWinnerName}"`);
                     if (result.finalLoserId === socket.player.id) {
                         this.world.removePlayer(socket.player.id);
                         this.world.setKillMessage(result.finalWinnerName, result.finalLoserName, 'player');
@@ -162,7 +165,9 @@ class TcpServer {
                     this.world.setLastCombat(result);
                     // We don't move if we fought
                 } else if (collidingMob) {
+                    hadCollision = true;
                     const result = CombatResolver.resolveBattle(socket.player, collidingMob);
+                    console.log(`  ⚔️  TCP Combat: "${socket.player.name}" vs "${collidingMob.name}" - Winner: "${result.finalWinnerName}"`);
                     if (result.finalLoserId === socket.player.id) {
                         this.world.removePlayer(socket.player.id);
                         this.world.setKillMessage(result.finalWinnerName, result.finalLoserName, 'player');
@@ -176,21 +181,23 @@ class TcpServer {
                     socket.player.setPosition(newX, newY);
                     console.log(`  🎮 TCP Move: ${socket.player.name} to (${newX}, ${newY})`);
                 }
-            }
 
-            // Send State Update back to client
-            const resp = Buffer.alloc(4);
-            resp.writeUInt8(0x02, 0); // Type
-            resp.writeUInt8(Math.floor(socket.player.x), 1);
-            resp.writeUInt8(Math.floor(socket.player.y), 2);
-            resp.writeUInt8(socket.player.health, 3);
-            socket.write(resp);
+                // Send State Update back to client: 0x02 [X] [Y] [Health] [Collision]
+                const resp = Buffer.alloc(5);
+                resp.writeUInt8(0x02, 0); // Type
+                resp.writeUInt8(Math.floor(socket.player.x), 1);
+                resp.writeUInt8(Math.floor(socket.player.y), 2);
+                resp.writeUInt8(socket.player.health, 3);
+                resp.writeUInt8(hadCollision ? 1 : 0, 4); // Collision flag
+                socket.write(resp);
+            }
         }
     }
 
     handleGetState(socket) {
         // Trigger world update (tick, mob movement, etc)
-        this.world.getState();
+        const worldState = this.world.getState();
+        const ticks = worldState.ticks % 65536; // Limit to 16-bit
 
         const players = Array.from(this.world.players.values());
         const mobs = Array.from(this.world.mobs.values());
@@ -198,10 +205,13 @@ class TcpServer {
 
         const count = Math.min(all.length, 255);
 
-        const buf = Buffer.alloc(2 + count * 3);
+        // Format: 0x03 [Count] [TicksLow] [TicksHigh] [Entity1: Type X Y] [Entity2: ...]
+        const buf = Buffer.alloc(4 + count * 3);
         let offset = 0;
         buf.writeUInt8(0x03, offset++);
         buf.writeUInt8(count, offset++);
+        buf.writeUInt8(ticks & 0xFF, offset++);        // Ticks low byte
+        buf.writeUInt8((ticks >> 8) & 0xFF, offset++); // Ticks high byte
 
         for (let i = 0; i < count; i++) {
             const ent = all[i];

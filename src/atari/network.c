@@ -160,9 +160,9 @@ static uint8_t kz_network_move_player_tcp(const char *player_id, const char *dir
     
     if (network_write(tcp_device_spec, buf, 2) != FN_ERR_OK) return 0;
     
-    /* Resp: 0x02 [X] [Y] [Health] */
-    len = network_read(tcp_device_spec, buf, 4);
-    if (len < 4 || buf[0] != 0x02) return 0;
+    /* Resp: 0x02 [X] [Y] [Health] [Collision] */
+    len = network_read(tcp_device_spec, buf, 5);
+    if (len < 5 || buf[0] != 0x02) return 0;
     
     result->x = buf[1];
     result->y = buf[2];
@@ -174,7 +174,7 @@ static uint8_t kz_network_move_player_tcp(const char *player_id, const char *dir
         ((player_state_t*)local)->y = result->y;
     }
     
-    result->collision = 0; // Simplified for now
+    result->collision = buf[4];
     result->message_count = 0;
     
     return 1;
@@ -208,11 +208,15 @@ uint8_t kz_network_get_world_state(void) {
         buf[0] = 0x03;
         if (network_write(tcp_device_spec, buf, 1) != FN_ERR_OK) return 0;
         
-        /* Resp: 0x03 [Count] -> ... */
-        len = network_read(tcp_device_spec, buf, 2);
-        if (len < 2 || buf[0] != 0x03) return 0;
+        /* Resp: 0x03 [Count] [TicksLow] [TicksHigh] -> ... */
+        len = network_read(tcp_device_spec, buf, 4);
+        if (len < 4 || buf[0] != 0x03) return 0;
         
         count = buf[1];
+        {
+            uint16_t ticks = buf[2] | (buf[3] << 8);
+            state_set_world_ticks(ticks);
+        }
         local = state_get_local_player();
         
         for (i = 0; i < count; i++) {
