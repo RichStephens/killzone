@@ -1,5 +1,5 @@
 /**
- * KillZone Input Module - Atari 8-bit
+ * KillZone Input Module
  * 
  * Handles keyboard and joystick input.
  */
@@ -7,7 +7,11 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+#ifdef _CMOC_VERSION_
+#include <cmoc.h>
+#else
 #include <stdint.h>
+#endif
 
 /* Input commands */
 typedef enum {

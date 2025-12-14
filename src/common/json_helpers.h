@@ -1,5 +1,5 @@
 /**
- * KillZone JSON Helpers - Atari 8-bit
+ * KillZone JSON Helpers
  * 
  * Helper functions for querying JSON data via FujiNet.
  */
@@ -7,8 +7,13 @@
 #ifndef JSON_HELPERS_H
 #define JSON_HELPERS_H
 
+#ifdef _CMOC_VERSION_
+#include <cmoc.h>
+#include <coco.h>
+#else
 #include <stdint.h>
 #include <stddef.h>
+#endif
 
 /**
  * Query an integer value from JSON

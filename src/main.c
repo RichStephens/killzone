@@ -187,8 +187,12 @@ void handle_state_joining(void) {
     /* Normal join flow - prompt for name */
     display_show_join_prompt();
     
+#ifdef _CMOC_VERSION_
+    get_line(player_name, sizeof(player_name) - 1);
+#else
     fflush(stdout);
     fgets(player_name, sizeof(player_name), stdin);
+#endif
     
     /* Remove newline and carriage return */
     len = strlen(player_name);

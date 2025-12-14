@@ -1,5 +1,11 @@
 CC := cmoc
 
+# CMOC include path for its own headers
+CMOC_INCLUDE := /usr/local/share/cmoc/include
+
+# Prevent using macOS system headers - use CMOC's own headers
+CFLAGS += -nostdinc -I$(CMOC_INCLUDE)
+
 ASFLAGS += -I src/common -I src/$(CURRENT_PLATFORM) -I src/current-target/$(CURRENT_TARGET)
 CFLAGS += -I src/common -I src/$(CURRENT_PLATFORM) -I src/current-target/$(CURRENT_TARGET)
 
