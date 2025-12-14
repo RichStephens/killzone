@@ -3,8 +3,14 @@
  */
 
 #include "input.h"
+#ifdef _CMOC_VERSION_
+#include <cmoc.h>
+#include <coco.h>
+#include "conio_wrapper.h"
+#else
 #include <conio.h>
 #include <stdio.h>
+#endif
 
 /**
  * Initialize input system

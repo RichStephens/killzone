@@ -1,6 +1,6 @@
 # Sample Makefile For FujiNet Applications
 
-TARGETS = atari coco
+TARGETS = atari
 PROGRAM := killzone
 
 # Set this to the version of FN-LIB you wish to use in this project:

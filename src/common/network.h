@@ -1,15 +1,19 @@
 /**
- * KillZone Network Module - Atari 8-bit
+ * KillZone Network Module
  * 
- * FujiNet HTTP wrapper for server communication.
- * Uses fujinet-network.h library for HTTP operations.
+ * FujiNet communication with TCP binary protocol.
+ * Uses fujinet-network.h library for network operations.
  */
 
 #ifndef KILLZONE_NETWORK_H
 #define KILLZONE_NETWORK_H
 
+#ifdef _CMOC_VERSION_
+#include <cmoc.h>
+#else
 #include <stdint.h>
 #include <stddef.h>
+#endif
 #include "state.h"
 
 #include "constants.h"

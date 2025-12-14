@@ -1,11 +1,15 @@
 /**
- * KillZone JSON Helpers Implementation - Atari 8-bit
+ * KillZone JSON Helpers Implementation
  */
 
 #include "json_helpers.h"
 #include "fujinet-network.h"
+#ifdef _CMOC_VERSION_
+#include <cmoc.h>
+#else
 #include <stdlib.h>
 #include <string.h>
+#endif
 
 uint8_t json_query_int(const char *device_spec, const char *query, uint32_t *val, char *buffer) {
     if (network_json_query((char *)device_spec, (char *)query, buffer) == FN_ERR_OK) {

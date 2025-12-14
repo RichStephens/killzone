@@ -1,5 +1,5 @@
 /**
- * KillZone Atari 8-bit Client - Main Game Loop
+ * KillZone Client - Main Game Loop
  * 
  * Phase 3: Movement & Real-Time Synchronization
  * - Keyboard input handling
@@ -8,11 +8,18 @@
  * - Combat handling
  */
 
+#ifdef _CMOC_VERSION_
+#include <cmoc.h>
+#include <coco.h>
+#include "conio_wrapper.h"
+#include "snprintf.h"
+#else
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <conio.h>
+#endif
 
 #include "network.h"
 #include "state.h"

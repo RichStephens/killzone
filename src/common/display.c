@@ -1,15 +1,22 @@
 /**
- * KillZone Display Module Implementation - Atari 8-bit
+ * KillZone Display Module Implementation
  * 
  * Text-based display rendering.
- * Uses Atari's text mode with last 4 lines for status bar.
+ * Uses text mode with last 4 lines for status bar.
  */
 
 #include "display.h"
 #include "network.h"
+#ifdef _CMOC_VERSION_
+#include <cmoc.h>
+#include <coco.h>
+#include "conio_wrapper.h"
+#include "snprintf.h"
+#else
 #include <stdio.h>
 #include <string.h>
 #include <conio.h>
+#endif
 
 /* Direct drawing to screen, no buffer needed */
 
