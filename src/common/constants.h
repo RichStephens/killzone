@@ -29,7 +29,7 @@
 #define PLAYER_NAME_MAX 32
 
 /* Server Configuration */
-#define SERVER_HOST "192.168.1.69"
+#define SERVER_HOST "127.0.0.1"
 #define SERVER_PORT 3000
 #define SERVER_PROTO "http"
 #define SERVER_TCP_PORT 3001
